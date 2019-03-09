@@ -1,9 +1,5 @@
-from multiprocessing import Pool,cpu_count
-
 def f(x,SN_limits=[10,100],translation_distance=5):
     import numpy as np
-    import sys
-    sys.path.insert(0,"C:/Users/Simulator/Desktop/Martin Selin/DeepTrack 1.0/") #
     import feature_by_feature as fbf
     image_generator = fbf.get_default_image_generator_deeptrack(translation_distance=translation_distance,SN_limits=SN_limits) # change for various parameters
     targets = np.zeros((x,3))
@@ -33,6 +29,7 @@ def get_images_mp(sample_size_total,SN_limits=[10,100],translation_distance=5):
 
     if __name__ == '__main__' or __name__=='mp_images_new':
         import numpy as np
+
         from multiprocessing import Pool,cpu_count
         from functools import partial
 
