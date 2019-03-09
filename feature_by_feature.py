@@ -227,6 +227,7 @@ def FBF_sum_modular_deeptrack(
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
     save_networks=True,
+    # TODO add mp functionality option
     model_path=""):
     """
     Function implementing the more advanced modular FBF which has denser connctions.
@@ -364,7 +365,8 @@ def fbf_modular_expand_layer(
     """
     Function for expanding preexisting layer of an fbf_modular model.
     Inputs:
-
+        expansion_size - number of nodes which layer should be expanded with
+        train_generator - image generator for the new nodes to be trained on
     Outputs:
 
     """
@@ -404,7 +406,38 @@ def fbf_modular_expand_layer(
             network.save(model_path+"L1_"+str(i+1)+"F.h5")
 
     return network,conv_list,output_list,flattened_list,input_tensor
-
+def get_modular_terms_outputs(input_tensor,output_node_list,images):
+    """
+    Function which calculates the outputs from the various nodes(or layers) in output
+    node list on a specific image and returns them in a list.
+    Inputs:
+        input_tensor -input tensor to model as gotten from the fbf_modular_sum...
+        output_node_list - list of nodes which produce an output
+        images - images to make predictions on
+    Outputs:
+        predictions - predictions made by the different nodes
+    """
+    from keras.models import Model
+    from keras.layers import concatenate
+    import numpy as np
+    nbr_output_nodes = len(output_node_list)
+    if len(output_node_list)>1:
+        output = concatenate(output_node_list,axis=1)
+    else:
+        output = output_node_list[0]
+    network = Model(input_tensor,output)
+    predictions = network.predict(images)
+    predictions = np.reshape(predictions,(len(images),nbr_output_nodes,3))
+    return predictions
+# def get_modular_terms_outputs_from_network(network,images):
+#     """
+#
+#     """
+#     #layer.input
+#     from keras.models import Model
+#     new_output = network.layers[-1].input
+#     layer.get_input_at(node_index)
+#     return 0
 def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10,100]):
     import deeptrack
 

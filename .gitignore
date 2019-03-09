@@ -3,3 +3,4 @@ __pycache__
 /results
 /test_scripts
 /test_mp_images.py
+test_node_outputs.py
