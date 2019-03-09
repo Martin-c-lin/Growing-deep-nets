@@ -215,8 +215,6 @@ def fbf_sum_deeptrack(
             iteration_numbers = iteration_numbers,
             verbose=verbose)
         freeze_all_layers(model)
-        # for l in range(len(model.layers)):
-        #     model.layers[l].trainable = False
         model.save(model_path+"fbf_sum_DT_L1_"+str(i+1)+"F.h5")
         # Log both validation and test accuracy. But use only validation accuracy for the model to optimize its shape on
     return model,intermediate_conv,input_tensor# returns also intermediate models
@@ -302,7 +300,8 @@ def FBF_sum_modular_deeptrack_layer2(
     save_networks=True,
     model_path=""):
     """
-    Function for adding the second layer in a modular model
+    Function for adding a new layer in a modular fbf model, note that it adds a
+    convolutional layer with pooling.
     """
     import deeptrack
     import keras
@@ -363,6 +362,10 @@ def fbf_modular_expand_layer(
     save_networks=True,
     model_path=""):
     """
+    Function for expanding preexisting layer of an fbf_modular model.
+    Inputs:
+
+    Outputs:
 
     """
     import deeptrack
@@ -374,14 +377,7 @@ def fbf_modular_expand_layer(
     for i in range(expansion_size):
         next_neuron = layers.Conv2D(1,(3,3),activation='relu')(input_tensor)
         next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
-        # if(i==0):
-        #     # i = 0 special case. No addition needed
-        #     next_flattened = layers.Flatten()(next_neuron)
-        #     next_output = layers.Dense(3)(next_flattened)
-        #     final_outptut = next_output
-        #     output_list.append(next_output)
-        #     flattened_list.append(next_flattened)
-        # else:
+
         # Construct the next output neuron
         next_flattened = layers.Flatten()(next_neuron)
         flattened_list.append(next_flattened)
@@ -415,8 +411,6 @@ def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10
     ### Define image properties
     from numpy.random import randint, uniform, normal, choice
     from math import pi
-
-
 
     image_parameters_function = lambda : deeptrack.get_image_parameters(
        particle_center_x_list=lambda : normal(0, translation_distance, translation_distance),# normal(0, 1, 1), # increase these to get a more vivid approximation?

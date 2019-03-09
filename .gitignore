@@ -1,3 +1,5 @@
 log.txt
+__pycache__
 /results
-\results
+/test_scripts
+/test_mp_images.py
