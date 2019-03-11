@@ -52,7 +52,7 @@ def evaluate_noise_levels(
 
         ### Genereate images for evaluation
         images, targets = deeptrack.get_images_and_targets(image_generator,nbr_images_to_evaluate,image_shape=image_shape)
-        loss,mse,mae= network.evaluate(images,targets)
+        loss,mse,mae = network.evaluate(images,targets)
 
         ### Fix units and append to final results
         mse *= image_half_size()**2 #what happens if it is not a function? Silly error?

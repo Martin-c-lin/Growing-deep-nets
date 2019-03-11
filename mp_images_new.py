@@ -11,7 +11,7 @@ def f(x,SN_limits=[10,100],translation_distance=5):
         if image_number>=x:
             break
         images[image_number] = image
-
+        # Do same preprocessing as in deeptrack
         particle_center_x = image_parameters['Particle Center X List'][0]
         particle_center_y = image_parameters['Particle Center Y List'][0]
         targets[image_number] = [particle_center_x / half_image_size,

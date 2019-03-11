@@ -688,7 +688,8 @@ def train_deep_learning_network(
     return training_history
 def train_deep_learning_network_mp(
     network,
-    image_generator,
+    translation_distance=5,
+    SN_limits = [10,100],
     sample_sizes = (32, 128, 512, 2048),
     iteration_numbers = (3001, 2001, 1001, 101),
     verbose=True):
@@ -719,36 +720,21 @@ def train_deep_learning_network_mp(
         training_history['MAE'] = []
 
         for sample_size, iteration_number in zip(sample_sizes, iteration_numbers):
-            images_total,targets_total = mp_images.get_images_mp(sample_size*iteration_number)
+            images_total,targets_total = mp_images.get_images_mp(
+                    sample_size*iteration_number,
+                    SN_limits=SN_limits,
+                    translation_distance=translation_distance
+                    )
 
             for iteration in range(iteration_number):
                 images =  images_total[iteration*sample_size:(iteration+1)*sample_size]
                 targets = targets_total[iteration*sample_size:(iteration+1)*sample_size]
-                # print(images_total.shape)
-                # print(images[0])
-                                # meaure initial time for iteration
+
                 initial_time = time()
                 half_image_size = 25
                 # generate images and targets
                 image_shape = network.get_layer(index=0).get_config()['batch_input_shape'][1:]
 
-                # if(sample_size<200):
-                #     for image_number, image, image_parameters in image_generator():
-                #         if image_number>=sample_size:
-                #             break
-                #
-                #         resized_image = resize_image(image, (image_shape[0], image_shape[1]))
-                #         images[image_number] = resized_image.reshape(image_shape)
-                #
-                #         half_image_size = (image_shape[0] - 1) / 2
-                #         particle_center_x = image_parameters['Particle Center X List'][0]
-                #         particle_center_y = image_parameters['Particle Center Y List'][0]
-                #         targets[image_number] = [particle_center_x / half_image_size,
-                #                                  particle_center_y / half_image_size,
-                #                                  (particle_center_x**2 + particle_center_y**2)**.5 / half_image_size]
-                #else:
-                    # images,targets = mp_images.get_images_mp(sample_size) # WARNING REUTRNS USING DEFAULT IMAGE Generator
-                # training
                 history = network.fit(images,
                                     targets,
                                     epochs=1,

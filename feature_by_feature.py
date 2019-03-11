@@ -227,7 +227,9 @@ def FBF_sum_modular_deeptrack(
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
     save_networks=True,
-    # TODO add mp functionality option
+    mp_training = False, # use multiprocessing training
+    translation_distance=5, # parameters for multiprocessing training
+    SN_limits=[10,100], # parameters for multiprocessing training
     model_path=""):
     """
     Function implementing the more advanced modular FBF which has denser connctions.
@@ -274,12 +276,22 @@ def FBF_sum_modular_deeptrack(
         network.summary()
 
         # Train and freeze layers in network
-        deeptrack.train_deep_learning_network(
-            network,
-            train_generator,
-            sample_sizes = sample_sizes,
-            iteration_numbers = iteration_numbers,
-            verbose=verbose)
+        if mp_training:
+            deeptrack.train_deep_learning_network_mp(
+                network,
+                sample_sizes = sample_sizes,
+                iteration_numbers = iteration_numbers,
+                verbose=verbose,
+                SN_limits=SN_limits,
+                translation_distance=translation_distance,
+                )
+        else:
+            deeptrack.train_deep_learning_network(
+                network,
+                train_generator,
+                sample_sizes = sample_sizes,
+                iteration_numbers = iteration_numbers,
+                verbose=verbose)
 
         freeze_all_layers(network)
         conv_list.append(next_neuron)
@@ -293,11 +305,13 @@ def FBF_sum_modular_deeptrack_layer2(
     train_generator,
     conv_list,
     output_list,
-    #flattened_list, # not used
     input_tensor,
     sample_sizes=(8, 32, 128, 512, 1024),
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
+    mp_training = False, # use multiprocessing training?
+    translation_distance=5, # parameters for multiprocessing training
+    SN_limits=[10,100], # parameters for multiprocessing training
     save_networks=True,
     model_path=""):
     """
@@ -308,8 +322,6 @@ def FBF_sum_modular_deeptrack_layer2(
     import keras
     from keras import  Input,models,layers
     from keras.models import Model
-    #import deeptrackelli_mod_mproc as multiprocess_training
-    # Needed for fast parallelized image generator but don't yet support windows
 
     new_layer_conv_list = [] # Convolutions in the new layer
     new_layer_flattened_list = [] # flattened output from new layer
@@ -337,12 +349,29 @@ def FBF_sum_modular_deeptrack_layer2(
         network.summary()
 
         # Train and freeze layers in network
-        deeptrack.train_deep_learning_network(
-            network,
-            train_generator,
-            sample_sizes = sample_sizes,
-            iteration_numbers = iteration_numbers,
-            verbose=verbose)
+
+        if mp_training:
+            deeptrack.train_deep_learning_network_mp(
+                network,
+                sample_sizes = sample_sizes,
+                iteration_numbers = iteration_numbers,
+                verbose=verbose,
+                SN_limits=SN_limits,
+                translation_distance=translation_distance,
+                )
+        else:
+            deeptrack.train_deep_learning_network(
+                network,
+                train_generator,
+                sample_sizes = sample_sizes,
+                iteration_numbers = iteration_numbers,
+                verbose=verbose)
+        # deeptrack.train_deep_learning_network(
+        #     network,
+        #     train_generator,
+        #     sample_sizes = sample_sizes,
+        #     iteration_numbers = iteration_numbers,
+        #     verbose=verbose)
 
         freeze_all_layers(network)
         new_layer_conv_list.append(next_neuron)
@@ -360,6 +389,9 @@ def fbf_modular_expand_layer(
     sample_sizes=(8, 32, 128, 512, 1024),
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
+    mp_training = False, # use multiprocessing training
+    translation_distance=5, # parameters for multiprocessing training
+    SN_limits=[10,100], # parameters for multiprocessing training
     save_networks=True,
     model_path=""):
     """
@@ -375,7 +407,7 @@ def fbf_modular_expand_layer(
     from keras import  Input,models,layers
     from keras.models import Model
     #import deeptrackelli_mod_mproc as multiprocess_training # Needed for fast parallelized image generator
-
+    base_length = len(conv_list)
     for i in range(expansion_size):
         next_neuron = layers.Conv2D(1,(3,3),activation='relu')(input_tensor)
         next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
@@ -393,17 +425,27 @@ def fbf_modular_expand_layer(
         network.summary()
 
         # Train and freeze layers in network
-        deeptrack.train_deep_learning_network(
-            network,
-            train_generator,
-            sample_sizes = sample_sizes,
-            iteration_numbers = iteration_numbers,
-            verbose=verbose)
+        if mp_training:
+            deeptrack.train_deep_learning_network_mp(
+                network,
+                sample_sizes = sample_sizes,
+                iteration_numbers = iteration_numbers,
+                verbose=verbose,
+                SN_limits=SN_limits,
+                translation_distance=translation_distance,
+                )
+        else:
+            deeptrack.train_deep_learning_network(
+                network,
+                train_generator,
+                sample_sizes = sample_sizes,
+                iteration_numbers = iteration_numbers,
+                verbose=verbose)
 
         freeze_all_layers(network)
         conv_list.append(next_neuron)
         if(save_networks):
-            network.save(model_path+"L1_"+str(i+1)+"F.h5")
+            network.save(model_path+"L1_"+str(i+base_length+1)+"F.h5") # fix layer_indexing
 
     return network,conv_list,output_list,flattened_list,input_tensor
 def get_modular_terms_outputs(input_tensor,output_node_list,images):
