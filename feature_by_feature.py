@@ -223,6 +223,7 @@ def FBF_modular_deeptrack(
     train_generator,
     input_shape=(51,51,1),
     output_shape=3,
+    nbr_nodes_added=1,
     sample_sizes=(8, 32, 128, 512, 1024),
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
@@ -255,8 +256,8 @@ def FBF_modular_deeptrack(
     output_list = [] # List of the output layers
 
     # Loop thorugh the neoruns and add them one by one
-    for i in range(layer_size):
-        next_neuron = layers.Conv2D(1,(3,3),activation='relu')(input_tensor)
+    for i in range(round(layer_size/nbr_nodes_added)):
+        next_neuron = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(input_tensor)
         next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
         if(i==0):
             # i = 0 special case. No addition needed
@@ -302,7 +303,7 @@ def FBF_modular_deeptrack(
         freeze_all_layers(network)
         conv_list.append(next_neuron)
         if(save_networks):
-            network.save(model_path+"L1_"+str(i+1)+"F.h5")
+            network.save(model_path+"L1_"+str((i+1)*nbr_nodes_added)+"F.h5")
     return network,conv_list,output_list,flattened_list,input_tensor
 def FBF_modular_deeptrack_new_layer(
     layer_size,
@@ -310,6 +311,8 @@ def FBF_modular_deeptrack_new_layer(
     conv_list,
     output_list,
     input_tensor,
+    layer_no=2,
+    nbr_nodes_added=1,
     sample_sizes=(8, 32, 128, 512, 1024),
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
@@ -335,8 +338,8 @@ def FBF_modular_deeptrack_new_layer(
         new_layer_input = layers.Concatenate()(conv_list)
     else:
         new_layer_input = conv_list[0]
-    for i in range(layer_size):
-        next_neuron = layers.Conv2D(1,(3,3),activation='relu')(new_layer_input)
+    for i in range(round(layer_size/nbr_nodes_added)):
+        next_neuron = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(new_layer_input)
         next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
         next_flattened = layers.Flatten()(next_neuron)
         new_layer_flattened_list.append(next_flattened)
@@ -381,7 +384,7 @@ def FBF_modular_deeptrack_new_layer(
         freeze_all_layers(network)
         new_layer_conv_list.append(next_neuron)
         if(save_networks):
-            network.save(model_path+"L2_"+str(i+1)+"F.h5")
+            network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5") # L2 all the time not optimal
     return network,new_layer_conv_list,output_list,new_layer_flattened_list,input_tensor
 def fbf_modular_expand_layer(
     expansion_size,
@@ -390,6 +393,8 @@ def fbf_modular_expand_layer(
     output_list,
     flattened_list,
     input_tensor,
+    layer_no=1,
+    nbr_nodes_added=1,# may be problematic if larger than expansion size
     sample_sizes=(8, 32, 128, 512, 1024),
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
@@ -413,8 +418,8 @@ def fbf_modular_expand_layer(
     from keras import  Input,models,layers
     from keras.models import Model
     base_length = len(conv_list)
-    for i in range(expansion_size):
-        next_neuron = layers.Conv2D(1,(3,3),activation='relu')(input_tensor)
+    for i in range(round(expansion_size/nbr_nodes_added)):
+        next_neuron = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(input_tensor)
         next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
 
         # Construct the next output neuron
@@ -428,7 +433,7 @@ def fbf_modular_expand_layer(
         else:
             final_output = layers.add(output_list)
         # Construct and compile network
-        network = models.Model(input_tensor,final_outptut)
+        network = models.Model(input_tensor,final_output)
         network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
         network.summary()
 
@@ -453,7 +458,7 @@ def fbf_modular_expand_layer(
         freeze_all_layers(network)
         conv_list.append(next_neuron)
         if(save_networks):
-            network.save(model_path+"L1_"+str(i+base_length+1)+"F.h5") # fix layer_indexing
+            network.save(model_path+"L"+str(layer_no)+"_"+str((i+base_length+1)*nbr_nodes_added)+"F.h5") # fix layer_indexing
 
     return network,conv_list,output_list,flattened_list,input_tensor
 def get_modular_terms_outputs(input_tensor,output_node_list,images):
