@@ -580,9 +580,7 @@ def get_images_and_targets(image_generator,sample_size,image_shape=(64,64,1)):
     """
 
     """
-    #image_shape = int(image_shape)
     import numpy as np
-    #image_shape = network.get_layer(index=0).get_config()['batch_input_shape'][1:]
     input_shape = (sample_size, image_shape[0], image_shape[1], image_shape[2])
     images = np.zeros(input_shape)
     output_shape = (sample_size, 3)
@@ -690,6 +688,7 @@ def train_deep_learning_network_mp(
     network,
     translation_distance=5,
     SN_limits = [10,100],
+    radius_limits=[1.5,3], # not used yet
     sample_sizes = (32, 128, 512, 2048),
     iteration_numbers = (3001, 2001, 1001, 101),
     verbose=True):

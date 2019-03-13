@@ -1,5 +1,5 @@
 log.txt
-Output_distribuions_modular_sums.ipynb
+*.ipynb
 __pycache__
 /results
 /test_scripts
@@ -7,3 +7,5 @@ __pycache__
 test_node_outputs.py
 /.ipynb_checkpoints
 *.h5
+*.npy
+test.py

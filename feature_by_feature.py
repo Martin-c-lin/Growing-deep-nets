@@ -218,7 +218,7 @@ def fbf_sum_deeptrack(
         model.save(model_path+"fbf_sum_DT_L1_"+str(i+1)+"F.h5")
         # Log both validation and test accuracy. But use only validation accuracy for the model to optimize its shape on
     return model,intermediate_conv,input_tensor# returns also intermediate models
-def FBF_sum_modular_deeptrack(
+def FBF_modular_deeptrack(
     layer_size,
     train_generator,
     input_shape=(51,51,1),
@@ -230,7 +230,10 @@ def FBF_sum_modular_deeptrack(
     mp_training = False, # use multiprocessing training
     translation_distance=5, # parameters for multiprocessing training
     SN_limits=[10,100], # parameters for multiprocessing training
-    model_path=""):
+    model_path="",
+    combination_layer_type='addition', # determines the type of layer used for combining the
+     # predictions. Addition and average only options at the moment
+    ):
     """
     Function implementing the more advanced modular FBF which has denser connctions.
 
@@ -269,7 +272,10 @@ def FBF_sum_modular_deeptrack(
             next_output = layers.Concatenate(axis=-1)(flattened_list)
             next_output = layers.Dense(3)(next_output)
             output_list.append(next_output)
-            final_outptut = layers.add(output_list)
+            if combination_layer_type=='average':
+                final_outptut = layers.average(output_list)
+            else:
+                final_outptut = layers.add(output_list)
             # Construct and compile network
         network = models.Model(input_tensor,final_outptut)
         network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
@@ -297,10 +303,8 @@ def FBF_sum_modular_deeptrack(
         conv_list.append(next_neuron)
         if(save_networks):
             network.save(model_path+"L1_"+str(i+1)+"F.h5")
-
-
     return network,conv_list,output_list,flattened_list,input_tensor
-def FBF_sum_modular_deeptrack_layer2(
+def FBF_modular_deeptrack_new_layer(
     layer_size,
     train_generator,
     conv_list,
@@ -313,14 +317,15 @@ def FBF_sum_modular_deeptrack_layer2(
     translation_distance=5, # parameters for multiprocessing training
     SN_limits=[10,100], # parameters for multiprocessing training
     save_networks=True,
-    model_path=""):
+    model_path="",
+    combination_layer_type='addition',):
     """
     Function for adding a new layer in a modular fbf model, note that it adds a
     convolutional layer with pooling.
     """
     import deeptrack
-    import keras
-    from keras import  Input,models,layers
+    #import keras
+    from keras import  models,layers
     from keras.models import Model
 
     new_layer_conv_list = [] # Convolutions in the new layer
@@ -342,7 +347,13 @@ def FBF_sum_modular_deeptrack_layer2(
             next_output = layers.Concatenate(axis=-1)(new_layer_flattened_list)
             next_output = layers.Dense(3)(next_output)
         output_list.append(next_output)
-        total_output = layers.add(output_list)
+
+        # Add combination layer
+        if combination_layer_type=='average':
+            total_output = layers.average(output_list)
+        else:
+            total_output = layers.add(output_list)
+
         # Construct and compile network
         network = models.Model(input_tensor,total_output)
         network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
@@ -366,16 +377,9 @@ def FBF_sum_modular_deeptrack_layer2(
                 sample_sizes = sample_sizes,
                 iteration_numbers = iteration_numbers,
                 verbose=verbose)
-        # deeptrack.train_deep_learning_network(
-        #     network,
-        #     train_generator,
-        #     sample_sizes = sample_sizes,
-        #     iteration_numbers = iteration_numbers,
-        #     verbose=verbose)
 
         freeze_all_layers(network)
         new_layer_conv_list.append(next_neuron)
-        #new_layer_flattened_list.append(next_flattened)
         if(save_networks):
             network.save(model_path+"L2_"+str(i+1)+"F.h5")
     return network,new_layer_conv_list,output_list,new_layer_flattened_list,input_tensor
@@ -393,7 +397,9 @@ def fbf_modular_expand_layer(
     translation_distance=5, # parameters for multiprocessing training
     SN_limits=[10,100], # parameters for multiprocessing training
     save_networks=True,
-    model_path=""):
+    model_path="",
+    combination_layer_type='addition',
+    ):
     """
     Function for expanding preexisting layer of an fbf_modular model.
     Inputs:
@@ -406,7 +412,6 @@ def fbf_modular_expand_layer(
     import keras
     from keras import  Input,models,layers
     from keras.models import Model
-    #import deeptrackelli_mod_mproc as multiprocess_training # Needed for fast parallelized image generator
     base_length = len(conv_list)
     for i in range(expansion_size):
         next_neuron = layers.Conv2D(1,(3,3),activation='relu')(input_tensor)
@@ -418,13 +423,16 @@ def fbf_modular_expand_layer(
         next_output = layers.Concatenate(axis=-1)(flattened_list)
         next_output = layers.Dense(3)(next_output)
         output_list.append(next_output)
-        final_outptut = layers.add(output_list)
+        if combination_layer_type=='average':
+            final_output = layers.average(output_list)
+        else:
+            final_output = layers.add(output_list)
         # Construct and compile network
         network = models.Model(input_tensor,final_outptut)
         network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
         network.summary()
 
-        # Train and freeze layers in network
+        # Train and then freeze layers in network
         if mp_training:
             deeptrack.train_deep_learning_network_mp(
                 network,
@@ -480,7 +488,7 @@ def get_modular_terms_outputs(input_tensor,output_node_list,images):
 #     new_output = network.layers[-1].input
 #     layer.get_input_at(node_index)
 #     return 0
-def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10,100]):
+def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10,100],radius_limits=[1.5,3]):
     import deeptrack
 
     ### Define image properties
@@ -490,7 +498,7 @@ def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10
     image_parameters_function = lambda : deeptrack.get_image_parameters(
        particle_center_x_list=lambda : normal(0, translation_distance, translation_distance),# normal(0, 1, 1), # increase these to get a more vivid approximation?
        particle_center_y_list=lambda : normal(0, translation_distance, translation_distance),# normal(0, 1, 1),
-       particle_radius_list=lambda : uniform(1.5, 3, 1),
+       particle_radius_list=lambda : uniform(radius_limits[0],radius_limits[1], 1),
        particle_bessel_orders_list=lambda : [[randint(1, 3),], ],
        particle_intensities_list=lambda : [[choice([-1, 1]) * uniform(.2, .6, 1), ], ],
        image_half_size=lambda : 25,
