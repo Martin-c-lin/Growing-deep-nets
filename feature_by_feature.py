@@ -257,18 +257,18 @@ def FBF_modular_deeptrack(
 
     # Loop thorugh the neoruns and add them one by one
     for i in range(round(layer_size/nbr_nodes_added)):
-        next_neuron = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(input_tensor)
-        next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
+        next_node = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(input_tensor)
+        next_node = layers.MaxPooling2D((2,2))(next_node)
         if(i==0):
             # i = 0 special case. No addition needed
-            next_flattened = layers.Flatten()(next_neuron)
+            next_flattened = layers.Flatten()(next_node)
             next_output = layers.Dense(3)(next_flattened)
             final_outptut = next_output
             output_list.append(next_output)
             flattened_list.append(next_flattened)
         else:
-            # Construct the next output neuron
-            next_flattened = layers.Flatten()(next_neuron)
+            # Construct the next output node
+            next_flattened = layers.Flatten()(next_node)
             flattened_list.append(next_flattened)
             next_output = layers.Concatenate(axis=-1)(flattened_list)
             next_output = layers.Dense(3)(next_output)
@@ -301,12 +301,12 @@ def FBF_modular_deeptrack(
                 verbose=verbose)
 
         freeze_all_layers(network)
-        conv_list.append(next_neuron)
+        conv_list.append(next_node)
         if(save_networks):
             network.save(model_path+"L1_"+str((i+1)*nbr_nodes_added)+"F.h5")
     return network,conv_list,output_list,flattened_list,input_tensor
 def FBF_modular_deeptrack_new_layer(
-    layer_size,
+    layer_size, # Total number of nodes in layer
     train_generator,
     conv_list,
     output_list,
@@ -321,30 +321,45 @@ def FBF_modular_deeptrack_new_layer(
     SN_limits=[10,100], # parameters for multiprocessing training
     save_networks=True,
     model_path="",
-    combination_layer_type='addition',):
+    combination_layer_type='addition',
+    layer_type='conv'):
     """
     Function for adding a new layer in a modular fbf model, note that it adds a
     convolutional layer with pooling.
     """
     import deeptrack
-    #import keras
     from keras import  models,layers
     from keras.models import Model
 
-    new_layer_conv_list = [] # Convolutions in the new layer
+    new_layer_node_list = [] # Convolutions in the new layer
     new_layer_flattened_list = [] # flattened output from new layer
 
+    # Create input tenosr for new node
     if len(conv_list)>1:
         new_layer_input = layers.Concatenate()(conv_list)
     else:
         new_layer_input = conv_list[0]
+
+    # If next layer is dense then we (probably) need to flatten previous input
+    if layer_type=='dense':
+        import keras.backend as K
+        # Check dimension of previous output to see if Flatten layer is neede.
+        prev_out_size = K.shape(new_layer_input).shape
+        if(prev_out_size[0]>2):
+            new_layer_input = layers.Flatten()(new_layer_input)
+
+    # Add all the new nodes and train network in between
     for i in range(round(layer_size/nbr_nodes_added)):
-        next_neuron = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(new_layer_input)
-        next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
-        next_flattened = layers.Flatten()(next_neuron)
+        if layer_type=='dense':
+            next_node = layers.Dense(nbr_nodes_added,activation='relu')(new_layer_input)
+            next_flattened = next_node
+        else:
+            next_node = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(new_layer_input)
+            next_node = layers.MaxPooling2D((2,2))(next_node)
+            next_flattened = layers.Flatten()(next_node)
         new_layer_flattened_list.append(next_flattened)
         if(i==0):
-            # i = 0 special case. No addition needed
+            # i = 0 special case. No concatenation needed
             next_output = layers.Dense(3)(next_flattened) # Different for i==0
         else:
             next_output = layers.Concatenate(axis=-1)(new_layer_flattened_list)
@@ -382,10 +397,12 @@ def FBF_modular_deeptrack_new_layer(
                 verbose=verbose)
 
         freeze_all_layers(network)
-        new_layer_conv_list.append(next_neuron)
+        new_layer_node_list.append(next_node)
         if(save_networks):
             network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5") # L2 all the time not optimal
-    return network,new_layer_conv_list,output_list,new_layer_flattened_list,input_tensor
+
+    # IF dense statement needed
+    return network,new_layer_node_list,output_list,new_layer_flattened_list,input_tensor
 def fbf_modular_expand_layer(
     expansion_size,
     train_generator,
@@ -419,11 +436,11 @@ def fbf_modular_expand_layer(
     from keras.models import Model
     base_length = len(conv_list)
     for i in range(round(expansion_size/nbr_nodes_added)):
-        next_neuron = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(input_tensor)
-        next_neuron = layers.MaxPooling2D((2,2))(next_neuron)
+        next_node = layers.Conv2D(nbr_nodes_added,(3,3),activation='relu')(input_tensor)
+        next_node = layers.MaxPooling2D((2,2))(next_node)
 
-        # Construct the next output neuron
-        next_flattened = layers.Flatten()(next_neuron)
+        # Construct the next output node
+        next_flattened = layers.Flatten()(next_node)
         flattened_list.append(next_flattened)
         next_output = layers.Concatenate(axis=-1)(flattened_list)
         next_output = layers.Dense(3)(next_output)
@@ -456,11 +473,12 @@ def fbf_modular_expand_layer(
                 verbose=verbose)
 
         freeze_all_layers(network)
-        conv_list.append(next_neuron)
+        conv_list.append(next_node)
         if(save_networks):
             network.save(model_path+"L"+str(layer_no)+"_"+str((i+base_length+1)*nbr_nodes_added)+"F.h5") # fix layer_indexing
 
     return network,conv_list,output_list,flattened_list,input_tensor
+
 def get_modular_terms_outputs(input_tensor,output_node_list,images):
     """
     Function which calculates the outputs from the various nodes(or layers) in output
@@ -484,15 +502,7 @@ def get_modular_terms_outputs(input_tensor,output_node_list,images):
     predictions = network.predict(images)
     predictions = np.reshape(predictions,(len(images),nbr_output_nodes,3))
     return predictions
-# def get_modular_terms_outputs_from_network(network,images):
-#     """
-#
-#     """
-#     #layer.input
-#     from keras.models import Model
-#     new_output = network.layers[-1].input
-#     layer.get_input_at(node_index)
-#     return 0
+
 def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10,100],radius_limits=[1.5,3]):
     import deeptrack
 
@@ -516,19 +526,19 @@ def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10
     image_generator = lambda : deeptrack.get_image_generator(image_parameters_function)
 
     return image_generator
-def modular_fbf_weight_initializer(size_inputs,size_outputs,neuron_number):
+def modular_fbf_weight_initializer(size_inputs,size_outputs,node_number):
     """
     Customized weight initializer for fbf modular. Initializer is a modification
     of Glorot uniform
     Inputs:
-        size_inputs - number of inputs to neuron
-        size_outputs - number of outputs of neuron
-        neuron number - the index of the current neuron
+        size_inputs - number of inputs to node
+        size_outputs - number of outputs of node
+        node number - the index of the current node
     Outputs:
         initializer
     """
     from keras.initializers import RandomUniform
     import math
     limit = math.sqrt(6/(size_inputs+size_outputs))
-    limit /= neuron_number
+    limit /= node_number
     return RandomUniform(minval=-limit,maxval=limit)
