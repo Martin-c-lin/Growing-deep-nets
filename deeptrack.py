@@ -373,13 +373,6 @@ def fbf_layer_first(max_number_of_features,image_generator,input_shape=(51,51,1)
                                 sample_sizes,
                                 iteration_numbers,
                                 verbose)
-        # Fit model and evaluate results
-        # model.fit_generator(
-        #       train_generator,
-        #       steps_per_epoch=100,
-        #       epochs=nbr_of_epochs,
-        #       callbacks=[callback_grad_conv,callback_grad_dense]
-        #       )
 
         # Make the old layers in the model non trainable
         for l in range(len(model.layers)):
@@ -507,8 +500,6 @@ def train_growing_network(
     save_networks=True,
     path=""):
     # function for growing and training a neural network conv base..
-
-
     ### Expand to cover arbitrary number of layers?
 
     ### train first layer
@@ -599,7 +590,14 @@ def get_images_and_targets(image_generator,sample_size,image_shape=(64,64,1)):
                                  particle_center_y / half_image_size,
                                  (particle_center_x**2 + particle_center_y**2)**.5 / half_image_size]
     return images,targets
-
+def initialize_training_history():
+    training_history = {}
+    training_history['Sample Size'] = []
+    training_history['Iteration Number'] = []
+    training_history['Iteration Time'] = []
+    training_history['MSE'] = []
+    training_history['MAE'] = []
+    return training_history
 def train_deep_learning_network(
     network,
     image_generator,
@@ -623,13 +621,7 @@ def train_deep_learning_network(
 
     import numpy as np
     from time import time
-
-    training_history = {}
-    training_history['Sample Size'] = []
-    training_history['Iteration Number'] = []
-    training_history['Iteration Time'] = []
-    training_history['MSE'] = []
-    training_history['MAE'] = []
+    training_history = initialize_training_history()
 
     for sample_size, iteration_number in zip(sample_sizes, iteration_numbers):
         for iteration in range(iteration_number):
@@ -688,7 +680,7 @@ def train_deep_learning_network_mp(
     network,
     translation_distance=5,
     SN_limits = [10,100],
-    radius_limits=[1.5,3], # not used yet
+    radius_limits=[1.5,3], # 
     sample_sizes = (32, 128, 512, 2048),
     iteration_numbers = (3001, 2001, 1001, 101),
     verbose=True):
@@ -708,56 +700,78 @@ def train_deep_learning_network_mp(
     """
     if __name__ =='deeptrack':
         import numpy as np
-        from time import time
+        #from time import time
         import mp_images_new as mp_images
         print(__name__)
-        training_history = {}
-        training_history['Sample Size'] = []
-        training_history['Iteration Number'] = []
-        training_history['Iteration Time'] = []
-        training_history['MSE'] = []
-        training_history['MAE'] = []
-
+        training_history = initialize_training_history()
+        max_images = 103424# can't keep more many more images in memory.
+        # outomatically fix so that fewer are generated at a time and memory does
+        # not run out
         for sample_size, iteration_number in zip(sample_sizes, iteration_numbers):
-            images_total,targets_total = mp_images.get_images_mp(
-                    sample_size*iteration_number,
-                    SN_limits=SN_limits,
-                    translation_distance=translation_distance
-                    )
+            # Find max number of images which fits into memory and is divisible
+            # by sample_size
+            N = iteration_number*sample_size # Total number of images to get for
+            # this iteration_number and sample_size
+            max_nbr_images = max_images - (max_images%sample_size)
+            image_batches = [] # Images to get in each bunch
+            # Calculate appropriate image batches which are all dicisible by sample size
+            for n in range(round(N/max_nbr_images)+1):
+                if n ==0:
+                    image_batches.append(N%max_nbr_images)
+                else:
+                    image_batches.append(max_nbr_images)
+            # loop over the image batches
+            for images_to_get in image_batches:
+                images_total,targets_total = mp_images.get_images_mp(
+                        images_to_get,
+                        SN_limits=SN_limits,
+                        translation_distance=translation_distance
+                        )
 
-            for iteration in range(iteration_number):
-                images =  images_total[iteration*sample_size:(iteration+1)*sample_size]
-                targets = targets_total[iteration*sample_size:(iteration+1)*sample_size]
+                for iteration in range(round(images_to_get/sample_size)):
+                    images =  images_total[iteration*sample_size:(iteration+1)*sample_size]
+                    targets = targets_total[iteration*sample_size:(iteration+1)*sample_size]
+                    train_network_on_images(network,images,targets,iteration,training_history)
 
-                initial_time = time()
-                half_image_size = 25
-                # generate images and targets
-                image_shape = network.get_layer(index=0).get_config()['batch_input_shape'][1:]
-
-                history = network.fit(images,
-                                    targets,
-                                    epochs=1,
-                                    batch_size=sample_size,
-                                    verbose=False)
-
-                # measure elapsed time during iteration
-                iteration_time = time() - initial_time
-
-                # record training history
-                mse = history.history['mean_squared_error'][0] * half_image_size**2
-                mae = history.history['mean_absolute_error'][0] * half_image_size
-
-                training_history['Sample Size'].append(sample_size)
-                training_history['Iteration Number'].append(iteration)
-                training_history['Iteration Time'].append(iteration_time)
-                training_history['MSE'].append(mse)
-                training_history['MAE'].append(mae)
-
-                if not(iteration%int(verbose**-1)):
-                    print('Sample size %6d   iteration number %6d   MSE %10.2f px^2   MAE %10.2f px   Time %10.2f ms' % (sample_size, iteration + 1, mse, mae, iteration_time * 1000))
+                    if not(iteration%int(verbose**-1)):
+                        mse = training_history['MSE'][-1]
+                        mae = training_history['MAE'][-1]
+                        iteration_time = training_history['Iteration Time'][-1]
+                        print('Sample size %6d   iteration number %6d   MSE %10.2f px^2   MAE %10.2f px   Time %10.2f ms' % (sample_size, iteration + 1, mse, mae, iteration_time * 1000))
 
         return training_history
 
+def train_network_on_images(network,images,targets,iteration=1,training_history=None):
+    """
+    Train network for a single batch on a set of images
+    """
+    from time import time
+    initial_time = time()
+    if training_history is None:
+        training_history = initialize_training_history()
+    sample_size = len(images)
+    image_shape=images[0].shape
+    half_image_size = round(image_shape[1]/2)
+    history = network.fit(images,
+                        targets,
+                        epochs=1,
+                        batch_size=sample_size,
+                        verbose=False)
+
+    # measure elapsed time during iteration
+    iteration_time = time() - initial_time
+
+    # record training history
+    mse = history.history['mean_squared_error'][0] * half_image_size**2
+    mae = history.history['mean_absolute_error'][0] * half_image_size
+
+    training_history['Sample Size'].append(sample_size)
+    training_history['Iteration Number'].append(iteration)
+    training_history['Iteration Time'].append(iteration_time)
+    training_history['MSE'].append(mse)
+    training_history['MAE'].append(mae)
+
+    return training_history
 def plot_learning_performance(training_history, number_of_timesteps_for_average = 100, figsize=(20,20)):
     """Plot the learning performance of the deep learning network.
 
