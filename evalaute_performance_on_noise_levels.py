@@ -15,24 +15,29 @@ particle_center_x_list = lambda : normal(0, translation_distance, translation_di
 particle_center_y_list = lambda : normal(0, translation_distance, translation_distance)
 particle_radius_list=lambda : uniform(3, 5, 1)
 #fbf_model_path = "C:/Users/Simulator/Desktop/Martin Selin/DeepTrack 1.0/FBF_modular new/models/high_noise_normal/"
-fbf_model_path = "C:/Users/Simulator/Desktop/Martin Selin/DeepTrack 1.0/FBF_modular new/models/"#high_noise_modular2/"
-
-nbr_layers = 1
-nbr_features = 17
-#SNT_levels = [5,10,20,30,50,100]
+fbf_model_path = "C:/Users/Simulator/Desktop/Martin Selin/DeepTrack 1.0/FBF_modular new/models03_14/4-layers_run2/"#high_noise_modular2/"
+nbr_layers = 4
+nbr_features = [16,32,64,128]
+step = 8
 SNT_levels = [5,10,20,30,50,100]
-fbf_model_results = np.zeros((3,len(SNT_levels),nbr_layers,nbr_features))
+#fbf_model_results = np.zeros((3,len(SNT_levels),nbr_layers,nbr_features))
+total_nbr_nodes = 0
+for n in nbr_features:
+    total_nbr_nodes+=n
+fbf_model_results = np.zeros( (3,len(SNT_levels),round(total_nbr_nodes/step) ) )
 
 nbr_images_to_evaluate = 1000
 np.save("nbr_images_evaluated_on",nbr_images_to_evaluate)
 np.save("SNT_levels",SNT_levels)
-
+idx = 0
 for i in range(nbr_layers):
-    for j in range(nbr_features):
-        model_name = fbf_model_path+"avg_testingL"+str(i+1)+"_"+str(j+1)+"F.h5"
+    for j in range(round(nbr_features[i]/step)):
+        nodes = (j+1)*step
+        model_name = fbf_model_path+"L"+str(i+1)+"_"+str(nodes)+"F.h5"
         #model_name =fbf_model_path+"layer_no"+str(i+1)+"top_size"+str(j+1)+".h5"
+
         model = load_model(model_name)
-        fbf_model_results[0,:,i,j],fbf_model_results[1,:,i,j],fbf_model_results[2,:,i,j]= edp.evaluate_noise_levels(
+        fbf_model_results[0,:,idx],fbf_model_results[1,:,idx],fbf_model_results[2,:,idx]= edp.evaluate_noise_levels(
             model,
             SNT_levels,
             nbr_images_to_evaluate=nbr_images_to_evaluate,
@@ -41,6 +46,7 @@ for i in range(nbr_layers):
             #particle_radius_list=particle_radius_list
             )
         model.summary()
-        print(fbf_model_results[:,0,i,j])
+        print(fbf_model_results[:,0,idx])
+        idx+=1
         del(model)
-np.save("results/avg_modular",fbf_model_results)
+np.save("results/modular_4_layers_normal_train_time_S8",fbf_model_results)
