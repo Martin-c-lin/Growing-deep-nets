@@ -564,7 +564,7 @@ def single_output_modular_L1(
 def modular_single_output_new_layer(
     layer_size, # Total number of nodes in layer
     train_generator,
-    conv_list,
+    conv_list, # Should rename this one
     final_output,
     input_tensor,
     layer_no=2,
@@ -656,7 +656,68 @@ def modular_single_output_new_layer(
 
     # IF dense statement needed
     return network,new_layer_node_list,final_output,new_layer_flattened_list,input_tensor
+def single_output_modular_full_model(
+    layer_sizes,
+    layer_types,
+    train_generator, # Not strictily needed if mp is used
+    input_shape=(51,51,1),
+    output_shape=3,
+    nbr_nodes_added=1,# TODO Make array
+    sample_sizes=(8, 32, 128, 512, 1024),
+    iteration_numbers=(401, 301, 201, 101, 51),
+    verbose=0.01,
+    save_networks=True,
+    mp_training = False, # use multiprocessing training
+    translation_distance=5, # parameters for multiprocessing training
+    SN_limits=[10,100], # parameters for multiprocessing training
+    model_path=""):
+    """
+    Function for building a whole network using the single output style
+    Inputs:
 
+    Outputs:
+
+    """
+    if len(layer_sizes)<1:
+        print("Error no layer sizes given")
+        return 0
+
+    # Are new layer node list and conv_list the same? Will be bug otherwise
+    network,new_layer_node_list,flattened_list,input_tensor,final_output= single_output_modular_L1(
+        layer_size=layer_sizes[0],
+        train_generator=train_generator,
+        input_shape=input_shape,
+        output_shape=output_shape,
+        nbr_nodes_added=nbr_nodes_added,
+        sample_sizes=sample_sizes,
+        iteration_numbers=iteration_numbers,
+        verbose=verbose,
+        save_networks=save_networks,
+        mp_training = mp_training, # use multiprocessing training
+        translation_distance=translation_distance, # parameters for multiprocessing training
+        SN_limits=SN_limits, # parameters for multiprocessing training
+        model_path=model_path,
+         )
+    for i in range(len(layer_sizes)-1):
+        idx = i+1
+        network,new_layer_node_list,final_output,new_layer_flattened_list,input_tensor=modular_single_output_new_layer(
+            layer_size=layer_sizes[idx], # Total number of nodes in layer
+            train_generator=train_generator,
+            conv_list=new_layer_node_list,
+            final_output=final_output,
+            input_tensor=input_tensor,
+            layer_no=idx+1,
+            nbr_nodes_added=nbr_nodes_added,
+            sample_sizes=sample_sizes,
+            iteration_numbers=iteration_numbers,
+            verbose=verbose,
+            mp_training = mp_training, # use multiprocessing training?
+            translation_distance=translation_distance, # parameters for multiprocessing training
+            SN_limits=SN_limits, # parameters for multiprocessing training
+            save_networks=save_networks,
+            model_path=model_path,
+            layer_type=layer_types[idx])
+    return network
 def get_modular_terms_outputs(input_tensor,output_node_list,images):
     """
     Function which calculates the outputs from the various nodes(or layers) in output
