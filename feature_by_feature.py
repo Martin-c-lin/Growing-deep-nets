@@ -218,7 +218,7 @@ def fbf_sum_deeptrack(
         model.save(model_path+"fbf_sum_DT_L1_"+str(i+1)+"F.h5")
         # Log both validation and test accuracy. But use only validation accuracy for the model to optimize its shape on
     return model,intermediate_conv,input_tensor# returns also intermediate models
-def FBF_modular_deeptrack(
+def FBF_modular_deeptrack(# bad name
     layer_size,
     train_generator,
     input_shape=(51,51,1),
@@ -413,6 +413,7 @@ def FBF_modular_deeptrack_new_layer(
 
     # IF dense statement needed
     return network,new_layer_node_list,output_list,new_layer_flattened_list,input_tensor
+    # Should not return input tenrsor
 def fbf_modular_expand_layer(
     expansion_size,
     train_generator,
@@ -488,6 +489,74 @@ def fbf_modular_expand_layer(
             network.save(model_path+"L"+str(layer_no)+"_"+str((i+base_length+1)*nbr_nodes_added)+"F.h5") # fix layer_indexing
 
     return network,conv_list,output_list,flattened_list,input_tensor
+def modular_full_network(
+    layer_sizes,
+    train_generator,
+    layer_types,
+    input_shape=(51,51,1),
+    output_shape=3,
+    nbr_nodes_added=1,
+    sample_sizes=(8, 32, 128, 512, 1024),
+    iteration_numbers=(401, 301, 201, 101, 51),
+    verbose=0.01,
+    save_networks=True,
+    mp_training = False, # use multiprocessing training
+    translation_distance=5, # parameters for multiprocessing training
+    SN_limits=[10,100], # parameters for multiprocessing training
+    model_path="",
+    combination_layer_type='sum'
+    ):
+    if len(layer_sizes)<1:
+        print("Too few layer sizes given")
+        return 0
+    network,node_list,output_list,flattened_list,input_tensor=FBF_modular_deeptrack(
+        layer_size=layer_sizes[0],
+        train_generator=train_generator,
+        input_shape=input_shape,
+        output_shape=output_shape,
+        nbr_nodes_added=nbr_nodes_added,
+        sample_sizes=sample_sizes,
+        iteration_numbers=iteration_numbers,
+        verbose=verbose,
+        save_networks=save_networks,
+        mp_training=mp_training, # use multiprocessing training
+        translation_distance=translation_distance, # parameters for multiprocessing training
+        SN_limits=SN_limits, # parameters for multiprocessing training
+        model_path=model_path,
+        combination_layer_type=combination_layer_type
+    )
+    """
+    Function for building and training a full modular network usign either
+    average or sum for final combination layer.
+    Inputs:
+        layer_sizes - nbr of nodes in each layer
+        layer_types - types of layers to use #TODO improve this one
+
+    Outputs:
+        network - A finihsed modular network which is trained.
+    """
+    for i in range(len(layer_sizes)-1):
+        idx = i+1
+        network,node_list,output_list,new_layer_flattened_list,input_tensor = FBF_modular_deeptrack_new_layer(
+            layer_size=layer_sizes[idx], # Total number of nodes in layer
+            train_generator=train_generator,
+            conv_list=node_list,
+            output_list=output_list,
+            input_tensor=input_tensor,
+            layer_no=idx+1,
+            nbr_nodes_added=nbr_nodes_added,
+            sample_sizes=sample_sizes,
+            iteration_numbers=iteration_numbers,
+            verbose=verbose,
+            mp_training = mp_training, # use multiprocessing training?
+            translation_distance=translation_distance, # parameters for multiprocessing training
+            SN_limits=SN_limits, # parameters for multiprocessing training
+            save_networks=save_networks,
+            model_path=model_path,
+            combination_layer_type=combination_layer_type,
+            layer_type=layer_types[idx])
+    return network
+
 def single_output_modular_L1(
     layer_size,
     train_generator,
