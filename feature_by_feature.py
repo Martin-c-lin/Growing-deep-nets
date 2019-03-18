@@ -555,6 +555,7 @@ def modular_full_network(
             model_path=model_path,
             combination_layer_type=combination_layer_type,
             layer_type=layer_types[idx])
+            
     return network
 
 def single_output_modular_L1(
