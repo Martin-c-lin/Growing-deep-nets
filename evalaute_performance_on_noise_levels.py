@@ -15,10 +15,10 @@ particle_center_x_list = lambda : normal(0, translation_distance, translation_di
 particle_center_y_list = lambda : normal(0, translation_distance, translation_distance)
 particle_radius_list=lambda : uniform(3, 5, 1)
 #fbf_model_path = "C:/Users/Simulator/Desktop/Martin Selin/DeepTrack 1.0/FBF_modular new/models/high_noise_normal/"
-fbf_model_path = "C:/Users/Simulator/Desktop/Martin Selin/DeepTrack 1.0/FBF_modular new/models03_14/4-layers_run2/"#high_noise_modular2/"
+fbf_model_path = "C:/Users/Simulator/Desktop/Martin Selin/DeepTrack 1.0/FBF_modular new/models03_14/4-layers_long_traing1/"#high_noise_modular2/"
 nbr_layers = 4
 nbr_features = [16,32,64,128]
-step = 8
+step = 16
 SNT_levels = [5,10,20,30,50,100]
 #fbf_model_results = np.zeros((3,len(SNT_levels),nbr_layers,nbr_features))
 total_nbr_nodes = 0
@@ -49,4 +49,4 @@ for i in range(nbr_layers):
         print(fbf_model_results[:,0,idx])
         idx+=1
         del(model)
-np.save("results/modular_4_layers_normal_train_time_S8",fbf_model_results)
+np.save("results/modular_4_layers_long",fbf_model_results)

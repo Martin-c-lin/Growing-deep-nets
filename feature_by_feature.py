@@ -655,7 +655,7 @@ def modular_single_output_new_layer(
             network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5") # L2 all the time not optimal
 
     # IF dense statement needed
-    return network,new_layer_node_list,final_output,new_layer_flattened_list,input_tensor
+    return network,new_layer_node_list,final_output,new_layer_flattened_list
 
 def get_modular_terms_outputs(input_tensor,output_node_list,images):
     """
