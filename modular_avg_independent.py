@@ -97,7 +97,7 @@ def independent_avg_modular_deeptrack_L1(# bad name
     print('final network architecture')
     network.summary()
     if(save_networks):
-        network.save(model_path+"final_L"+str(layer_no)+"_F.h5")
+        network.save(model_path+"final_L"+str(1)+"_F.h5")
     return network,conv_list,output_list,flattened_list,input_tensor
 def independent_avg_modular_deeptrack_new_layer(
     layer_size, # Total number of nodes in layer
@@ -186,7 +186,7 @@ def independent_avg_modular_deeptrack_new_layer(
         freeze_all_layers(network)
         new_layer_node_list.append(next_node)
         if(save_networks):
-            network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5") 
+            network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5")
     avg_out = layers.average(output_list)
     network = models.Model(input_tensor,avg_out)
     network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])

@@ -795,15 +795,16 @@ def get_modular_terms_outputs(input_tensor,output_node_list,images):
     return predictions
 
 def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10,100],radius_limits=[1.5,3]):
+    """
+    Returns a default image genereator for deeptrack. Allows for some parameter tweaking.
+    """
     import deeptrack
-
-    ### Define image properties
     from numpy.random import randint, uniform, normal, choice
     from math import pi
 
     image_parameters_function = lambda : deeptrack.get_image_parameters(
-       particle_center_x_list=lambda : normal(0, translation_distance, translation_distance),# normal(0, 1, 1), # increase these to get a more vivid approximation?
-       particle_center_y_list=lambda : normal(0, translation_distance, translation_distance),# normal(0, 1, 1),
+       particle_center_x_list=lambda : normal(0, translation_distance, translation_distance),
+       particle_center_y_list=lambda : normal(0, translation_distance, translation_distance),
        particle_radius_list=lambda : uniform(radius_limits[0],radius_limits[1], 1),
        particle_bessel_orders_list=lambda : [[randint(1, 3),], ],
        particle_intensities_list=lambda : [[choice([-1, 1]) * uniform(.2, .6, 1), ], ],
