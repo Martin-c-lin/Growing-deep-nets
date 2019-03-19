@@ -793,7 +793,14 @@ def get_modular_terms_outputs(input_tensor,output_node_list,images):
     predictions = network.predict(images)
     predictions = np.reshape(predictions,(len(images),nbr_output_nodes,3))
     return predictions
-
+def get_inputs_to_last_layer(model):
+    """
+    Takes a network and returns a network which outputs the inputs to the last
+    layer of that network. Useful for monitoring modular networks.
+    """
+    from keras.models import Model
+    intermediate_layer_model = Model(inputs=model.input,outputs=model.layers[-1].input)
+    return intermediate_layer_model
 def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10,100],radius_limits=[1.5,3]):
     """
     Returns a default image genereator for deeptrack. Allows for some parameter tweaking.
