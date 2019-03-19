@@ -1,7 +1,3 @@
-# import keras
-# from keras import  Input,models,layers
-# from keras.models import Model
-
 def print_results_to_file(network,history,file_name,model_name):
     """
     Prints history and model setup
@@ -401,9 +397,7 @@ def FBF_modular_deeptrack_new_layer(
         freeze_all_layers(network)
         new_layer_node_list.append(next_node)
         if(save_networks):
-            network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5") # L2 all the time not optimal
-
-    # IF dense statement needed
+            network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5")
     return network,new_layer_node_list,output_list,new_layer_flattened_list,input_tensor
     # Should not return input tenrsor
 def fbf_modular_expand_layer(
@@ -497,6 +491,15 @@ def modular_full_network(
     model_path="",
     combination_layer_type='sum'
     ):
+    """
+    Function for building and training a full modular network usign either
+    average or sum for final combination layer.
+    Inputs:
+        layer_sizes - nbr of nodes in each layer
+        layer_types - types of layers to use #TODO improve this one
+    Outputs:
+        network - A finihsed modular network which is trained.
+    """
     if len(layer_sizes)<1:
         print("Too few layer sizes given")
         return 0
@@ -516,15 +519,7 @@ def modular_full_network(
         model_path=model_path,
         combination_layer_type=combination_layer_type
     )
-    """
-    Function for building and training a full modular network usign either
-    average or sum for final combination layer.
-    Inputs:
-        layer_sizes - nbr of nodes in each layer
-        layer_types - types of layers to use #TODO improve this one
-    Outputs:
-        network - A finihsed modular network which is trained.
-    """
+
     for i in range(len(layer_sizes)-1):
         idx = i+1
         network,node_list,output_list,new_layer_flattened_list,input_tensor = FBF_modular_deeptrack_new_layer(
@@ -711,7 +706,7 @@ def modular_single_output_new_layer(
         freeze_all_layers(network)
         new_layer_node_list.append(next_node)
         if(save_networks):
-            network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5") # L2 all the time not optimal
+            network.save(model_path+"L"+str(layer_no)+"_"+str((i+1)*nbr_nodes_added)+"F.h5")
 
     # IF dense statement needed
     return network,new_layer_node_list,final_output,new_layer_flattened_list,input_tensor
