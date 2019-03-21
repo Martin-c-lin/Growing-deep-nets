@@ -9,3 +9,4 @@ test_node_outputs.py
 *.h5
 *.npy
 test.py
+*.txt
