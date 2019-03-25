@@ -680,7 +680,7 @@ def train_deep_learning_network_mp(
     network,
     translation_distance=5,
     SN_limits = [10,100],
-    radius_limits=[1.5,3], # 
+    radius_limits=[1.5,3], #
     sample_sizes = (32, 128, 512, 2048),
     iteration_numbers = (3001, 2001, 1001, 101),
     verbose=True):
@@ -715,11 +715,12 @@ def train_deep_learning_network_mp(
             max_nbr_images = max_images - (max_images%sample_size)
             image_batches = [] # Images to get in each bunch
             # Calculate appropriate image batches which are all dicisible by sample size
-            for n in range(round(N/max_nbr_images)+1):
+            for n in range(int(N/max_nbr_images)+1):
                 if n ==0:
                     image_batches.append(N%max_nbr_images)
                 else:
                     image_batches.append(max_nbr_images)
+            #print(max_nbr_images,sample_size,iteration_number,image_batches,int(N/max_nbr_images))
             # loop over the image batches
             for images_to_get in image_batches:
                 images_total,targets_total = mp_images.get_images_mp(
