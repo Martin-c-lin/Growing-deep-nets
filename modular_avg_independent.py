@@ -60,7 +60,10 @@ def independent_avg_modular_deeptrack_L1(# bad name
             # Construct the next output node
             next_flattened = layers.Flatten()(next_node)
             flattened_list.append(next_flattened)
-            next_output = layers.Concatenate(axis=-1)(flattened_list)
+            # Can't concatenate a single layer
+            if(len(flattened_list)>1):
+                next_output = layers.Concatenate(axis=-1)(flattened_list)
+
             next_output = layers.Dense(3)(next_output)
             output_list.append(next_output)
             # Construct and compile network
@@ -91,7 +94,10 @@ def independent_avg_modular_deeptrack_L1(# bad name
         if(save_networks):
             network.save(model_path+"L1_"+str((i+1)*nbr_nodes_added)+"F.h5")
     # Create final output using all the output layers and averaging them
-    avg_out = layers.average(output_list)
+    if(len(output_list)>1):
+        avg_out = layers.average(output_list)
+    else:
+        avg_out = output_list[0]
     network = models.Model(input_tensor,avg_out)
     network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
     print('final network architecture')
