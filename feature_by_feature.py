@@ -710,6 +710,41 @@ def modular_single_output_new_layer(
 
     # IF dense statement needed
     return network,new_layer_node_list,final_output,new_layer_flattened_list,input_tensor
+def normal_comp_full_models(
+    layer_sizes,
+    nbr_conv_layers,
+    train_generator, # Not strictily needed if mp is used
+    step=8,
+    input_shape=(51,51,1),
+    output_shape=3,
+    sample_sizes=(8, 32, 128, 512, 1024),
+    iteration_numbers=[4000, 3000, 2000, 1000, 500],
+    verbose=0.01,
+    save_networks=True,
+    mp_training = False, # use multiprocessing training
+    translation_distance=5, # parameters for multiprocessing training
+    SN_limits=[10,100], # parameters for multiprocessing training
+    model_path=""):
+    import deeptrack
+
+    for j in range(nbr_conv_layers):
+        for i in range(round(layer_sizes[j]/step)):
+            layer_size = (i+1)*step
+            network_trad = deeptrack.create_deep_learning_network_no_dense_top(
+                conv_layers_dimensions = [layer_size])
+
+            print("Multiprocessing image generation initiated")
+            deeptrack.train_deep_learning_network_mp(
+                    network_trad,
+                    sample_sizes = sample_sizes,
+                    iteration_numbers = iteration_numbers,
+                    SN_limits = SN_limits,
+                    translation_distance=translation_distance,
+                    verbose=0.01)
+            network_trad.summary()
+            model_name = trad_path+"layer_no1"+"top_size"+str(layer_size)+".h5"
+            network_trad.save(model_name)
+    return 0
 def single_output_modular_full_model(
     layer_sizes,
     layer_types,
