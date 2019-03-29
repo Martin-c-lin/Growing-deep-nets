@@ -46,7 +46,7 @@ def concatenate_layer_lists(list_A,list_B):
     """
     Concatenates the layers in two lists and puts the result in a new list.
     If one list is longer than the other than the extra elements of that list are
-    transfered directly.
+    transfered directly. If either contain None elements these are skipped.
     """
     from keras.layers import Concatenate
     concat_output_list = []
@@ -77,7 +77,6 @@ def residual_connection(input_tensor,output_dims):
     from keras import layers
     input_size = 1
     input_dims = input_tensor.shape[1:3]
-    print(input_dims)
     for input_dim in input_dims:
         input_size *= input_dim
 
@@ -91,9 +90,7 @@ def residual_connection(input_tensor,output_dims):
     padded = layers.ZeroPadding1D((0,padding_size))(flattened)
 
     output_shape = (int(output_dims[0]),int(output_dims[1]),nbr_layers_ouput)
-    print(output_shape,input_size,output_size,int(input_size),int(output_size))
     tmp = layers.Reshape(output_shape)(padded)
-    print(tmp[0])
     return tmp
 def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers,conv_layers_sizes,dense_layers_sizes,residual_connections=False):
     """
@@ -162,9 +159,10 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
 
     dense_output_list = concatenate_layer_lists(dense_layers,old_dense_layers)
 
+    # Previosly not added as intended! only connected to second to last output layer
     # Add output layer
     if len(dense_layers_sizes)>0:
-        final_output = layers.Dense(3)(new_dense_layer)
+        final_output = layers.Dense(3)(dense_output_list[-1])
     else:
         final_output = layers.Dense(3)(conv_output)
 
@@ -187,16 +185,21 @@ def build_modular_breadth_model(
         residual_connections=False
         ):
     """
-
+    residual_connections - Used to connect the first non-zero convolutional
+        layer directly also to input for expansion layers.
     """
     import deeptrack
+    import evaluate_deeptrack_performance as edp
+    import numpy as np
     # Create first network
     network,input_tensor,conv_layers_list,dense_layers_list,final_output = modular_breadth_network_start(conv_layers_sizes[0],dense_layers_sizes[0])
 
     # compile and verify appearence
     network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
     network.summary()
-
+    # Use default parameters for evaluation
+    SNR_evaluation_levels = [5,10,20,30,50,100]
+    nbr_images_to_evaluate = 1000
     # Train and freeze layers in network
     deeptrack.train_deep_learning_network_mp(
         network,
@@ -234,6 +237,15 @@ def build_modular_breadth_model(
             )
         freeze_all_layers(network)
         # Save network
-        if(save_networks):
+        if save_networks:
+            # don't work with the residual connections
             network.save(model_path+"network_no"+str(model_idx)+".h5")
+        # Evaluate performance on the fly if residual_connections are used
+        if residual_connections:
+            res = edp.evaluate_noise_levels(
+                network,
+                SNR_evaluation_levels,
+                nbr_images_to_evaluate=nbr_images_to_evaluate,
+                )
+            np.save(model_path+"model_no"+str(model_idx),res)
     return network
