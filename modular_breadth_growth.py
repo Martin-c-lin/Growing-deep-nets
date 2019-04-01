@@ -1,3 +1,36 @@
+def resize_images(images,new_size=24):
+    nbr_images = len(images)
+    resized = np.zeros((nbr_images,new_size,new_size,4))
+    for i in range(new_size):
+        for j in range(new_size):
+            resized[:,i,j,0] = images[:,2+2*i,1+2*j] # might need to switch down
+            # start index if padding usd in convolutions
+            resized[:,i,j,1] = images[:,1+2*i,2+2*j]
+            resized[:,i,j,2] = images[:,1+2*i,1+2*j]
+            resized[:,i,j,3] = images[:,2+2*i,2+2*j]
+    return resized
+def reformat_images_res_net(images,new_sizes):
+    """
+    Function which reformats images to make them in a suitable resnet format,
+    i.e variation of downsampling
+    """
+    import numpy as np
+    image_length = len(images)
+    print(new_sizes)
+    res = [images]
+    prev_images = images
+    for i in range(len(new_sizes)):
+        size = new_sizes[i]
+        nbr_channels = np.power(4,i+1)
+        prev_nbr_channels = np.power(4,i)
+        final_images = np.zeros((image_length,size,size,nbr_channels))
+        print(nbr_channels)
+        for i in range(prev_nbr_channels):
+            final_images[:,:,:,i*4:i*4+4] = resize_images(prev_images[:,:,:,i],size)
+        prev_images = final_images
+        res.append(final_images)
+    return res
+
 def modular_breadth_network_start(conv_layers_sizes,dense_layers_sizes,input_shape=(51,51,1)):
     """
     Function which creates the firs part of a breadthwise grown network
@@ -75,18 +108,20 @@ def residual_connection(input_tensor,output_dims):
     Ex transforms 51x51x1 image to 24x24x5 and pads the extra with zeros.
     """
     from keras import layers
+    #import keras.backend as K #for gather
     input_size = 1
     input_dims = input_tensor.shape[1:3]
     for input_dim in input_dims:
-        input_size *= input_dim
+        input_size *= int(input_dim)
 
     output_size = 1
     for output_dim in output_dims:
-        output_size *= output_dim
+        output_size *= int(output_dim)
     nbr_layers_ouput = int(int(input_size)/int(output_size))+1 # nbr layers we will need
     padding_size = int(nbr_layers_ouput*output_size - input_size)
 
     flattened = layers.Reshape((input_dims[0]*input_dims[1],1))(input_tensor)
+    # use gather to make it nicer?
     padded = layers.ZeroPadding1D((0,padding_size))(flattened)
 
     output_shape = (int(output_dims[0]),int(output_dims[1]),nbr_layers_ouput)
@@ -119,7 +154,6 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
                     if residual_connections:
                         # Create residual connection to input tensor
                         output_dims = old_conv_layers[i-1].shape[1:3]
-                        print(old_conv_layers[i-1].shape)
                         res_connection = residual_connection(input_tensor,output_dims)
                         new_input = layers.Concatenate(axis=-1)([res_connection,old_conv_layers[i-1]])
                         new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(new_input)
@@ -169,6 +203,86 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
     # Combine into single model
     network = models.Model(input_tensor,final_output)
     return network,conv_output_list,dense_output_list,final_output
+def modular_breadth_network_residual(input_tensors,old_conv_layers,old_dense_layers,conv_layers_sizes,dense_layers_sizes,residual_connections=False):
+    """
+    Function for growing a modular bredth network by adding another network next
+    to it.
+
+    """
+    import deeptrack
+    from keras import layers,models,Input
+    import numpy as np
+    conv_layers = []
+    dense_layers = []
+
+    input_tensor = input_tensors[0]
+
+    first_nonzero_idx = 0
+    # Add the convolutional layers
+    if(len(conv_layers_sizes)>0):
+        for i in range(len(conv_layers_sizes)):
+            if(conv_layers_sizes[i]<=0 and first_nonzero_idx==i):
+                first_nonzero_idx+=1
+                conv_layers.append(None)
+            else:
+                if i==0:# connect to input tensor
+                        new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(input_tensor)
+
+                elif i==first_nonzero_idx: # Connect only to old layers and perhaps a residual connection
+                    # Create residual connection to input tensor
+                    # Do this by creating a new input tensor and conncting the new node to that one along with
+                    # the previous node, not finished.
+                    output_dims = old_conv_layers[i-1].shape[1:3]
+                    nbr_channels = np.power(4,i)
+                    res_connection = Input((output_dims[0],output_dims[1],nbr_channels))#residual_connection(input_tensor,output_dims)
+                    input_tensors.append(res_connection)
+                    new_input = layers.Concatenate(axis=-1)([res_connection,old_conv_layers[i-1]])
+                    new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(new_input)
+
+
+                else:# connect to previous layer and old layer
+                    if(i<=len(old_conv_layers)): # Connect to previous network
+                        new_conv_layer = layers.Concatenate(axis=-1)([new_conv_layer,old_conv_layers[i-1]])
+                    new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(new_conv_layer)
+
+                new_conv_layer = layers.MaxPooling2D((2,2))(new_conv_layer)# add pooling
+                conv_layers.append(new_conv_layer)
+        conv_output = layers.Flatten()(new_conv_layer)
+    else:
+        # No convolutional layers in model
+        conv_output = layers.Flatten()(input_tensor)
+
+    # Need to transfer stuff into the new lists... so model can grow beyond two additions
+    conv_output_list = concatenate_layer_lists(conv_layers,old_conv_layers)
+    # Assumes previous conv_output not trivially connected to the input_tensor
+
+    # Can become odd here if the two networks being combined have different numbers of convolutional layers
+    # which is why we do like this
+    if(len(old_conv_layers)>=len(conv_layers)):
+        tmp_flatten = layers.Flatten()(old_conv_layers[-1])
+        conv_output = layers.Concatenate(axis=-1)([conv_output,tmp_flatten])
+    # Add the dense layers
+    for i in range(len(dense_layers_sizes)):
+        if i==0:
+            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(conv_output)
+        else:
+            if(i<=len(old_dense_layers)): # Connect to previous network
+                new_dense_layer = layers.Concatenate(axis=-1)([new_dense_layer,old_dense_layers[i-1]])
+            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(new_dense_layer)
+        dense_layers.append(new_dense_layer)
+
+    dense_output_list = concatenate_layer_lists(dense_layers,old_dense_layers)
+
+    # Previosly not added as intended! only connected to second to last output layer
+    # Add output layer
+    if len(dense_layers_sizes)>0:
+        final_output = layers.Dense(3)(dense_output_list[-1])
+    else:
+        final_output = layers.Dense(3)(conv_output)
+
+    # Combine into single model
+    network = models.Model(input_tensor,final_output)
+    return network,conv_output_list,dense_output_list,final_output,input_tensors
 def freeze_all_layers(model):
     for i in range(len(model.layers)):
         model.layers[i].trainable = False
