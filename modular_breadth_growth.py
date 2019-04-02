@@ -127,6 +127,63 @@ def residual_connection(input_tensor,output_dims):
     output_shape = (int(output_dims[0]),int(output_dims[1]),nbr_layers_ouput)
     tmp = layers.Reshape(output_shape)(padded)
     return tmp
+def get_new_res_weights(old_weights3x3,old_weights2x2):
+    """
+    """
+    old_weights3x3[0][:] = 0
+    old_weights3x3[1][0] = 0
+    for i in range(len(old_weights3x3[0][0,0,:,0])):
+        old_weights3x3[0][1,1,i,i] = 1 # not correct
+
+    old_weights2x2[1][:] = 0
+    old_weights2x2[0][:] = 0
+    #for j in range(len(old_weights2x2[0][0,0,:,0])):
+    nbr_inputs = len(old_weights2x2[0][0,0,:,0])
+    for i in range(int(len(old_weights2x2[0][0,0,0,:])/4)):
+            old_weights2x2[0][0,0,i,4*i+0]=1
+            old_weights2x2[0][1,0,i,4*i+1]=1
+            old_weights2x2[0][0,1,i,4*i+2]=1
+            old_weights2x2[0][1,1,i,4*i+3]=1
+    return old_weights3x3,old_weights2x2
+def new_residual_connection(input_tensor,nbr_steps):
+    """
+    Surperior implementation of residual conneciton to input layer for convolutioal
+    layers. Skips "nbr_steps" layers
+    """
+
+    # TODO make it possible to reuse existing residual connecitons!
+    from keras import models,layers
+    import numpy as np
+    res_layers = []
+    last = input_tensor
+
+    # Loop through all the layers and create residual connections,
+
+    for i in range(nbr_steps):
+
+        nbr_nodes = np.power(4,i) # nbr nodes to add in res connections
+
+        first = layers.Conv2D(nbr_nodes,(3,3),name='residual_'+str(i))(last)
+        last = layers.Conv2D(4*nbr_nodes,(2,2),strides=2,name='residual_second_'+str(i)+'_'+str(nbr_steps))(first)# Naming needs fixing
+
+        # Create model to easily acces weights
+        tmp_model = models.Model(input_tensor,last)
+        weights3x3 = tmp_model.layers[-2].get_weights()
+        weights2x2 = tmp_model.layers[-1].get_weights()
+
+        # get new weights for the residual connection
+        weights3x3,weights2x2 = get_new_res_weights(weights3x3,weights2x2)
+        tmp_model.layers[-2].set_weights(weights3x3)
+        tmp_model.layers[-1].set_weights(weights2x2)
+
+        # Make the residual connection non-trainable
+        tmp_model.layers[-2].trainable = False
+        tmp_model.layers[-1].trainable = False
+        res_layers.append(tmp_model.layers[-1])
+    #tmp_model.summary()
+
+    return last
+
 def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers,conv_layers_sizes,dense_layers_sizes,residual_connections=False):
     """
     Function for growing a modular bredth network by adding another network next
@@ -154,7 +211,9 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
                     if residual_connections:
                         # Create residual connection to input tensor
                         output_dims = old_conv_layers[i-1].shape[1:3]
-                        res_connection = residual_connection(input_tensor,output_dims)
+#                        res_connection = residual_connection(input_tensor,output_dims)
+                        res_connection = new_residual_connection(input_tensor,i)
+
                         new_input = layers.Concatenate(axis=-1)([res_connection,old_conv_layers[i-1]])
                         new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(new_input)
                     else:
@@ -355,11 +414,11 @@ def build_modular_breadth_model(
             # don't work with the residual connections
             network.save(model_path+"network_no"+str(model_idx)+".h5")
         # Evaluate performance on the fly if residual_connections are used
-        if residual_connections:
-            res = edp.evaluate_noise_levels(
-                network,
-                SNR_evaluation_levels,
-                nbr_images_to_evaluate=nbr_images_to_evaluate,
-                )
+        # if residual_connections:
+        #     res = edp.evaluate_noise_levels(
+        #         network,
+        #         SNR_evaluation_levels,
+        #         nbr_images_to_evaluate=nbr_images_to_evaluate,
+        #         )
             np.save(model_path+"model_no"+str(model_idx),res)
     return network
