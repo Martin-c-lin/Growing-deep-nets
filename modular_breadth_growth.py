@@ -30,7 +30,6 @@ def reformat_images_res_net(images,new_sizes):
         prev_images = final_images
         res.append(final_images)
     return res
-
 def modular_breadth_network_start(conv_layers_sizes,dense_layers_sizes,input_shape=(51,51,1)):
     """
     Function which creates the firs part of a breadthwise grown network
@@ -148,13 +147,12 @@ def get_new_res_weights(old_weights3x3,old_weights2x2):
     return old_weights3x3,old_weights2x2
 def new_residual_connection(input_tensor,nbr_steps):
     """
-    Surperior implementation of residual conneciton to input layer for convolutioal
-    layers. Skips "nbr_steps" layers
+    Surperior implementation for creating a new residual conneciton to input layer. Only for convolutioal
+    layers. Skips "nbr_steps" layers.
     """
-
-    # TODO make it possible to reuse existing residual connecitons!
     from keras import models,layers
     import numpy as np
+
     res_layers = []
     last = input_tensor
 
@@ -381,8 +379,6 @@ def build_modular_breadth_model(
         freeze_all_layers(network)
         # Save network
         if save_networks:
-            # don't work with the residual connections
             network.save(model_path+"network_no"+str(model_idx)+".h5")
 
-            np.save(model_path+"model_no"+str(model_idx),res)
     return network
