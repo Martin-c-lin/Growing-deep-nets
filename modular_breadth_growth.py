@@ -283,14 +283,26 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
         tmp_flatten = layers.Flatten()(old_conv_layers[-1])
         conv_output = layers.Concatenate(axis=-1)([conv_output,tmp_flatten])
     # Add the dense layers
+    first_nonzero_idx = 0
+
     for i in range(len(dense_layers_sizes)):
-        if i==0:
-            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(conv_output)
+        if dense_layers_sizes[i]<=0:
+                dense_layers.append(None)
+                first_nonzero_idx += 1
         else:
-            if(i<=len(old_dense_layers)): # Connect to previous network
-                new_dense_layer = layers.Concatenate(axis=-1)([new_dense_layer,old_dense_layers[i-1]])
-            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(new_dense_layer)
-        dense_layers.append(new_dense_layer)
+            if i==0:
+                new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(conv_output)
+            else:
+                if(i<=len(old_dense_layers)): # Connect to previous network
+                    if i==first_nonzero_idx:
+                        if len(conv_layers_sizes)>=1:
+                            new_dense_layer = layers.Concatenate(axis=-1)([conv_output,old_dense_layers[i-1]])
+                        else:
+                            new_dense_layer = old_dense_layers[i-1]
+                    else:
+                        new_dense_layer = layers.Concatenate(axis=-1)([new_dense_layer,old_dense_layers[i-1]])
+                new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(new_dense_layer)
+            dense_layers.append(new_dense_layer)
 
     dense_output_list = concatenate_layer_lists(dense_layers,old_dense_layers)
 
