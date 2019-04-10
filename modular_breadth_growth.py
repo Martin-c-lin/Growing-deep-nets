@@ -45,10 +45,11 @@ def modular_breadth_network_start(conv_layers_sizes,dense_layers_sizes,input_sha
     # Add the convolutional layers
     if(len(conv_layers_sizes)>0):
         for i in range(len(conv_layers_sizes)):
+            layer_name = 'Conv_1_'+str(i+1)
             if i==0:# connect to input tensor
-                new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(input_tensor)
+                new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu',name=layer_name)(input_tensor)
             else:# connect to previous layer
-                new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(new_conv_layer)
+                new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu',name=layer_name)(new_conv_layer)
             new_conv_layer = layers.MaxPooling2D((2,2))(new_conv_layer)# add pooling
             conv_layers.append(new_conv_layer)
         conv_output = layers.Flatten()(new_conv_layer)
@@ -59,17 +60,18 @@ def modular_breadth_network_start(conv_layers_sizes,dense_layers_sizes,input_sha
 
     # Add the dense layers
     for i in range(len(dense_layers_sizes)):
+        layer_name = 'Dense_1_'+str(i+1)
         if i==0:
-            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(conv_output)
+            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu',name=layer_name)(conv_output)
         else:
-            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(new_dense_layer)
+            new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu',name=layer_name)(new_dense_layer)
         dense_layers.append(new_dense_layer)
 
     # Add output layer
     if len(dense_layers_sizes)>0:
-        final_output = layers.Dense(3)(new_dense_layer)
+        final_output = layers.Dense(3,name='Output_1')(new_dense_layer)
     else:
-        final_output = layers.Dense(3)(conv_output)
+        final_output = layers.Dense(3,name='Output_1')(conv_output)
 
     # Combine into single model
     network = models.Model(input_tensor,final_output)
@@ -216,7 +218,7 @@ def extend_residual_connection(input_tensor,last_residual_connection,last_res_gr
         res_layers.append(tmp_model.layers[-1])
 
     return last
-def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers,conv_layers_sizes,dense_layers_sizes,residual_connections=False,nbr_residual_connections=0,last_residual_connection=None):
+def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers,conv_layers_sizes,dense_layers_sizes,residual_connections=False,nbr_residual_connections=0,last_residual_connection=None,model_idx=2):
     """
     Function for growing a modular bredth network by adding another network next
     to it.
@@ -231,12 +233,13 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
     # Add the convolutional layers
     if(len(conv_layers_sizes)>0):
         for i in range(len(conv_layers_sizes)):
+            layer_name = 'Conv_'+str(model_idx)+'_'+str(i+1)
             if(conv_layers_sizes[i]<=0 and first_nonzero_idx==i):
                 first_nonzero_idx+=1
                 conv_layers.append(None)
             else:
                 if i==0:# connect to input tensor
-                        new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(input_tensor)
+                        new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu',name=layer_name)(input_tensor)
 
                 elif i==first_nonzero_idx: # Connect only to old layers and perhaps a residual connection
 
@@ -253,14 +256,14 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
                         last_residual_connection = res_connection
 
                         new_input = layers.Concatenate(axis=-1)([res_connection,old_conv_layers[i-1]]) #need to fix so that we do not create new residual connections all the time
-                        new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(new_input)
+                        new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu',name=layer_name)(new_input)
                     else:
-                        new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(old_conv_layers[i-1])
+                        new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu',name=layer_name)(old_conv_layers[i-1])
 
                 else:# connect to previous layer and old layer
                     if(i<=len(old_conv_layers)): # Connect to previous network
                         new_conv_layer = layers.Concatenate(axis=-1)([new_conv_layer,old_conv_layers[i-1]])
-                    new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu')(new_conv_layer)
+                    new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu',name=layer_name)(new_conv_layer)
 
                 new_conv_layer = layers.MaxPooling2D((2,2))(new_conv_layer)# add pooling
                 conv_layers.append(new_conv_layer)
@@ -286,12 +289,13 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
     first_nonzero_idx = 0
 
     for i in range(len(dense_layers_sizes)):
+        layer_name = 'Dense_'+str(model_idx)+'_'+str(i+1)
         if dense_layers_sizes[i]<=0:
                 dense_layers.append(None)
                 first_nonzero_idx += 1
         else:
             if i==0:
-                new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(conv_output)
+                new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu',name=layer_name)(conv_output)
             else:
                 if(i<=len(old_dense_layers)): # Connect to previous network
                     if i==first_nonzero_idx:
@@ -301,7 +305,7 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
                             new_dense_layer = old_dense_layers[i-1]
                     else:
                         new_dense_layer = layers.Concatenate(axis=-1)([new_dense_layer,old_dense_layers[i-1]])
-                new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu')(new_dense_layer)
+                new_dense_layer = layers.Dense(dense_layers_sizes[i],activation='relu',name=layer_name)(new_dense_layer)
             dense_layers.append(new_dense_layer)
 
     dense_output_list = concatenate_layer_lists(dense_layers,old_dense_layers)
@@ -309,9 +313,9 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
     # Previosly not added as intended! only connected to second to last output layer
     # Add output layer
     if len(dense_layers_sizes)>0:
-        final_output = layers.Dense(3)(dense_output_list[-1])
+        final_output = layers.Dense(3,name='output_'+str(model_idx))(dense_output_list[-1])
     else:
-        final_output = layers.Dense(3)(conv_output)
+        final_output = layers.Dense(3,name='output_'+str(model_idx))(conv_output)
 
     # Combine into single model
     network = models.Model(input_tensor,final_output)
@@ -345,7 +349,7 @@ def build_modular_breadth_model(
     network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
     network.summary()
     # Use default parameters for evaluation
-    SNR_evaluation_levels = [5,10,20,30,50,100]
+    #SNR_evaluation_levels = [5,10,20,30,50,100]
     nbr_images_to_evaluate = 1000
     nbr_residual_connections = 0
     last_residual_connection = None
@@ -373,7 +377,8 @@ def build_modular_breadth_model(
             dense_layers_sizes[model_idx],
             residual_connections=residual_connections,
             nbr_residual_connections=nbr_residual_connections,
-            last_residual_connection=last_residual_connection
+            last_residual_connection=last_residual_connection,
+            model_idx=model_idx+1
             )
 
         network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
