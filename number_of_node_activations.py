@@ -39,32 +39,37 @@ def nbr_nonzero_dense_activations_single(prediction):
     fraction_nonzero /= len(prediction)
 
     return fraction_nonzero,results
-def nbr_nonzero_conv_activations(predictions):
+def nbr_nonzero_conv_activations_single(predictions):
     """
-
+    Check how many of the nodes activations where non-zero
     """
     import numpy as np
 
     nbr_nodes = len(predictions[0,0,:])
     results = np.zeros((nbr_nodes,1))
     fraction_nonzero = 0
-
     for i in range(nbr_nodes):
+        #print(np.max(predictions[:,:,i]),nbr_nodes)
         if np.max(predictions[:,:,i])>0:
             fraction_nonzero += 1
             results[i] = 1
     fraction_nonzero /= nbr_nodes
     return fraction_nonzero,results
-def nbr_nonzero_dense_activatoins_relu(predictions):
+def nbr_nonzero_activations_relu(predictions,type=0):
     """
 
     """
     import numpy as np
+    if len(predictions.shape)>2:
+        type = 1
     nbr_predictions = len(predictions)
     nonzero_fractions = np.zeros((nbr_predictions,1))
     activation_list = [] # List of the activations for the different inputs
     for i in range(nbr_predictions):
-        nonzero_fractions[i],activation = nbr_nonzero_dense_activations_single(predictions[i])
+        if type==0:
+            nonzero_fractions[i],activation = nbr_nonzero_dense_activations_single(predictions[i])
+        else:
+            nonzero_fractions[i],activation = nbr_nonzero_conv_activations_single(predictions[i])
         activation_list.append(activation)
     return nonzero_fractions,activation_list
 def evaluate_layer_activations(model,data,layer_idx): # Make it possible to speciy layer by name as well as index
@@ -72,4 +77,5 @@ def evaluate_layer_activations(model,data,layer_idx): # Make it possible to spec
 
     """
     predictions = get_predictions_from_layer(model,layer_idx,data)
-    return nbr_nonzero_dense_activatoins_relu(predictions)
+    #print(predictions.shape,len(predictions.shape))
+    return nbr_nonzero_activations_relu(predictions)
