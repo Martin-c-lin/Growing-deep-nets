@@ -19,7 +19,7 @@ def f(x,SN_limits=[10,100],translation_distance=5,radius_limits=[1.5,3]):
                                  (particle_center_x**2 + particle_center_y**2)**.5 / half_image_size]
 
     return images,targets
-def get_images_mp(sample_size_total,SN_limits=[10,100],translation_distance=5,radius_limits=[1.5,3]):
+def get_images_mp(sample_size_total,SN_limits=[10,100],translation_distance=1,radius_limits=[1.5,3]):
     """
     Function for creating images in a parallized way. Currently only works for specific image generators...
     Must be protected by a if __name__ == '__main__': or similar to work properly!
