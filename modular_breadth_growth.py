@@ -313,9 +313,9 @@ def modular_breadth_network_growth(input_tensor,old_conv_layers,old_dense_layers
     # Previosly not added as intended! only connected to second to last output layer
     # Add output layer
     if len(dense_layers_sizes)>0:
-        final_output = layers.Dense(3,name='output_'+str(model_idx))(dense_output_list[-1])
+        final_output = layers.Dense(3,name='Output_'+str(model_idx))(dense_output_list[-1])
     else:
-        final_output = layers.Dense(3,name='output_'+str(model_idx))(conv_output)
+        final_output = layers.Dense(3,name='Output_'+str(model_idx))(conv_output)
 
     # Combine into single model
     network = models.Model(input_tensor,final_output)
@@ -333,7 +333,8 @@ def build_modular_breadth_model(
         verbose=0.01,
         model_path="",
         save_networks=True,
-        residual_connections=False
+        residual_connections=False,
+        train_network=True
         ):
     """
     residual_connections - Used to connect the first non-zero convolutional
@@ -342,30 +343,33 @@ def build_modular_breadth_model(
     import deeptrack
     import evaluate_deeptrack_performance as edp
     import numpy as np
+
+    output_layers = [] # list of all output layers in model, used for training
+    # all layers at once
     # Create first network
     network,input_tensor,conv_layers_list,dense_layers_list,final_output = modular_breadth_network_start(conv_layers_sizes[0],dense_layers_sizes[0])
-
+    output_layers.append(final_output)
     # compile and verify appearence
-    network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
-    network.summary()
-    # Use default parameters for evaluation
-    #SNR_evaluation_levels = [5,10,20,30,50,100]
     nbr_images_to_evaluate = 1000
     nbr_residual_connections = 0
     last_residual_connection = None
-    # Train and freeze layers in network
+    if train_network:
+        network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
+        network.summary()
+        # Use default parameters for evaluation
+        # Train and freeze layers in network
 
-    deeptrack.train_deep_learning_network_mp(
-        network,
-        sample_sizes = sample_sizes,
-        iteration_numbers = iteration_numbers,
-        verbose=verbose,
-        SN_limits=SN_limits,
-        translation_distance=translation_distance,
-        )
-    freeze_all_layers(network)
-    if(save_networks):
-        network.save(model_path+"network_no"+str(0)+".h5")
+        deeptrack.train_deep_learning_network_mp(
+            network,
+            sample_sizes = sample_sizes,
+            iteration_numbers = iteration_numbers,
+            verbose=verbose,
+            SN_limits=SN_limits,
+            translation_distance=translation_distance,
+            )
+        freeze_all_layers(network)
+        if(save_networks):
+            network.save(model_path+"network_no"+str(0)+".h5")
     for i in range(len(conv_layers_sizes)-1):
         model_idx = i+1
         # Grow network
@@ -380,22 +384,75 @@ def build_modular_breadth_model(
             last_residual_connection=last_residual_connection,
             model_idx=model_idx+1
             )
+        output_layers.append(final_output)
 
-        network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
-        network.summary()
+        if train_network:
 
-        # Train and freeze layers in network
-        deeptrack.train_deep_learning_network_mp(
-            network,
-            sample_sizes = sample_sizes,
-            iteration_numbers = iteration_numbers,
-            verbose=verbose,
+            network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
+            network.summary()
+
+            # Train and freeze layers in network
+            deeptrack.train_deep_learning_network_mp(
+                network,
+                sample_sizes = sample_sizes,
+                iteration_numbers = iteration_numbers,
+                verbose=verbose,
+                SN_limits=SN_limits,
+                translation_distance=translation_distance,
+                )
+            freeze_all_layers(network)
+            # Save network
+            if save_networks:
+                network.save(model_path+"network_no"+str(model_idx)+".h5")
+    if train_network:
+        return network
+    return network,output_layers,input_tensor
+
+def simultaneus_training_network(conv_layers_sizes,
+        dense_layers_sizes,
+        sample_sizes=[8,32,128,512,1024],
+        iteration_numbers=[4000,3000,2000,1000,500],
+        SN_limits=[10,100],
+        translation_distance=1,
+        verbose=0.01,
+        model_path="",
+        save_networks=True,
+        residual_connections=False):
+    """
+    Function for building a multi-output network and then train it all outputs
+    at once.
+    """
+    from keras.models import Model
+    import deeptrack
+
+    network,output_layers,input_tensor = build_modular_breadth_model(
+            conv_layers_sizes=conv_layers_sizes,
+            dense_layers_sizes=dense_layers_sizes,
+            sample_sizes=sample_sizes,
+            iteration_numbers=iteration_numbers,
             SN_limits=SN_limits,
             translation_distance=translation_distance,
-            )
-        freeze_all_layers(network)
-        # Save network
-        if save_networks:
-            network.save(model_path+"network_no"+str(model_idx)+".h5")
-
-    return network
+            verbose=verbose,
+            model_path=model_path,
+            save_networks=save_networks,
+            residual_connections=residual_connections,
+            train_network=False)
+    single_network = Model(input_tensor,output_layers)
+    losses = []
+    # network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
+    for i in range(len(output_layers)):
+        losses.append('mse')
+    single_network.summary()
+    single_network.compile(optimizer='rmsprop', loss=losses, metrics=['mse', 'mae'])
+    deeptrack.train_deep_learning_network_mp(
+        single_network,
+        sample_sizes = sample_sizes,
+        iteration_numbers = iteration_numbers,
+        verbose=verbose,
+        SN_limits=SN_limits,
+        translation_distance=translation_distance,
+        nbr_outputs=len(output_layers)
+        )
+    if save_networks:
+        single_network.save(model_path+'simultaneus_training_network.h5')
+    return single_network
