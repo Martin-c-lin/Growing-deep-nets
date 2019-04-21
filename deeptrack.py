@@ -678,12 +678,13 @@ def train_deep_learning_network(
     return training_history
 def train_deep_learning_network_mp(
     network,
-    translation_distance=5,
+    translation_distance=1,
     SN_limits = [10,100],
     radius_limits=[1.5,3], #
     sample_sizes = (32, 128, 512, 2048),
     iteration_numbers = (3001, 2001, 1001, 101),
-    verbose=True):
+    verbose=True,
+    nbr_outputs=1):
     """Train a deep learning network.
 
     Input:
@@ -732,17 +733,20 @@ def train_deep_learning_network_mp(
                 for iteration in range(round(images_to_get/sample_size)):
                     images =  images_total[iteration*sample_size:(iteration+1)*sample_size]
                     targets = targets_total[iteration*sample_size:(iteration+1)*sample_size]
-                    train_network_on_images(network,images,targets,iteration,training_history)
+                    train_network_on_images(network,images,targets,iteration,training_history,nbr_outputs)
 
                     if not(iteration%int(verbose**-1)):
                         mse = training_history['MSE'][-1]
                         mae = training_history['MAE'][-1]
                         iteration_time = training_history['Iteration Time'][-1]
-                        print('Sample size %6d   iteration number %6d   MSE %10.2f px^2   MAE %10.2f px   Time %10.2f ms' % (sample_size, iteration + 1, mse, mae, iteration_time * 1000))
-
+                        if nbr_outputs<=1:
+                            print('Sample size %6d   iteration number %6d   MSE %10.2f px^2   MAE %10.2f px   Time %10.2f ms' % (sample_size, iteration + 1, mse, mae, iteration_time * 1000))
+                        else:
+                            print('Sample size '+str(sample_size)+   ' iteration number '+str(iteration + 1)+' MSE '+ str(mse)+'px^2   MAE'+ str(mae) +'px   Time'+ str(iteration_time * 1000))
+                            print()
         return training_history
 
-def train_network_on_images(network,images,targets,iteration=1,training_history=None):
+def train_network_on_images(network,images,targets,iteration=1,training_history=None,nbr_outputs=1):
     """
     Train network for a single batch on a set of images
     """
@@ -753,19 +757,35 @@ def train_network_on_images(network,images,targets,iteration=1,training_history=
     sample_size = len(images)
     image_shape=images[0].shape
     half_image_size = round(image_shape[1]/2)
-    history = network.fit(images,
-                        targets,
-                        epochs=1,
-                        batch_size=sample_size,
-                        verbose=False)
-
+    if nbr_outputs<=1:
+        history = network.fit(images,
+                            targets,
+                            epochs=1,
+                            batch_size=sample_size,
+                            verbose=False)
+    else:
+        target_array = []
+        for i in range(nbr_outputs):
+            target_array.append(targets)
+        history = network.fit(images,
+                            target_array,
+                            epochs=1,
+                            batch_size=sample_size,
+                            verbose=False)
     # measure elapsed time during iteration
     iteration_time = time() - initial_time
 
     # record training history
-    mse = history.history['mean_squared_error'][0] * half_image_size**2
-    mae = history.history['mean_absolute_error'][0] * half_image_size
+    if nbr_outputs<=1:
 
+        mse = history.history['mean_squared_error'][0] * half_image_size**2
+        mae = history.history['mean_absolute_error'][0] * half_image_size
+    else:
+        mse = []
+        mae = []
+        for i in range(nbr_outputs):
+            mse.append(history.history['Output_'+str(i+1)+'_mean_squared_error'][0] * half_image_size**2)
+            mae.append(history.history['Output_'+str(i+1)+'_mean_absolute_error'][0] * half_image_size)
     training_history['Sample Size'].append(sample_size)
     training_history['Iteration Number'].append(iteration)
     training_history['Iteration Time'].append(iteration_time)
