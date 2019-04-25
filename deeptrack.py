@@ -684,7 +684,8 @@ def train_deep_learning_network_mp(
     sample_sizes = (32, 128, 512, 2048),
     iteration_numbers = (3001, 2001, 1001, 101),
     verbose=True,
-    nbr_outputs=1):
+    nbr_outputs=1,
+    use_movie_parameters=False):
     """Train a deep learning network.
 
     Input:
@@ -727,7 +728,8 @@ def train_deep_learning_network_mp(
                 images_total,targets_total = mp_images.get_images_mp(
                         images_to_get,
                         SN_limits=SN_limits,
-                        translation_distance=translation_distance
+                        translation_distance=translation_distance,
+                        use_movie_parameters=use_movie_parameters,
                         )
 
                 for iteration in range(round(images_to_get/sample_size)):

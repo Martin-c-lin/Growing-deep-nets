@@ -334,7 +334,8 @@ def build_modular_breadth_model(
         model_path="",
         save_networks=True,
         residual_connections=False,
-        train_network=True
+        train_network=True,
+        use_movie_parameters=False,
         ):
     """
     residual_connections - Used to connect the first non-zero convolutional
@@ -366,6 +367,7 @@ def build_modular_breadth_model(
             verbose=verbose,
             SN_limits=SN_limits,
             translation_distance=translation_distance,
+            use_movie_parameters=use_movie_parameters,
             )
         freeze_all_layers(network)
         if(save_networks):
@@ -399,6 +401,7 @@ def build_modular_breadth_model(
                 verbose=verbose,
                 SN_limits=SN_limits,
                 translation_distance=translation_distance,
+                use_movie_parameters=use_movie_parameters,
                 )
             freeze_all_layers(network)
             # Save network

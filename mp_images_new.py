@@ -1,7 +1,29 @@
-def f(x,SN_limits=[10,100],translation_distance=5,radius_limits=[1.5,3]):
+def get_image_generator_movies():
+    from numpy.random import randint, uniform, normal, choice
+    from math import pi
+    import deeptrack
+    image_parameters_function = lambda : deeptrack.get_image_parameters(
+        particle_center_x_list=lambda : [normal(0 ,2, 1), ],
+        particle_center_y_list=lambda : [normal(0 ,2, 1), ],
+        particle_radius_list=lambda : uniform(2, 3, 1),
+        particle_bessel_orders_list=lambda : [[1, 2], ],
+        particle_intensities_list=lambda : [[uniform(.7, .9, 1), -uniform(.2, .3, 1)], ],
+        image_half_size=lambda : 25,
+        image_background_level=lambda : uniform(.2, .5),
+        signal_to_noise_ratio=lambda : uniform(5, 100),
+        gradient_intensity=lambda : uniform(0, .8),
+        gradient_direction=lambda : uniform(-pi, pi))
+
+    ### Define image generator
+    image_generator = lambda : deeptrack.get_image_generator(image_parameters_function)
+    return image_generator
+def f(x,SN_limits=[10,100],translation_distance=5,radius_limits=[1.5,3],use_movie_parameters=False):
     import numpy as np
     import feature_by_feature as fbf
-    image_generator = fbf.get_default_image_generator_deeptrack(translation_distance=translation_distance,SN_limits=SN_limits,radius_limits=radius_limits) # change for various parameters
+    if use_movie_parameters:
+        image_generator = get_image_generator_movies()
+    else:
+        image_generator = fbf.get_default_image_generator_deeptrack(translation_distance=translation_distance,SN_limits=SN_limits,radius_limits=radius_limits) # change for various parameters
     targets = np.zeros((x,3))
 
     images = np.zeros((x,51,51))
@@ -19,7 +41,7 @@ def f(x,SN_limits=[10,100],translation_distance=5,radius_limits=[1.5,3]):
                                  (particle_center_x**2 + particle_center_y**2)**.5 / half_image_size]
 
     return images,targets
-def get_images_mp(sample_size_total,SN_limits=[10,100],translation_distance=1,radius_limits=[1.5,3]):
+def get_images_mp(sample_size_total,SN_limits=[10,100],translation_distance=1,radius_limits=[1.5,3],use_movie_parameters=False):
     """
     Function for creating images in a parallized way. Currently only works for specific image generators...
     Must be protected by a if __name__ == '__main__': or similar to work properly!
@@ -38,7 +60,7 @@ def get_images_mp(sample_size_total,SN_limits=[10,100],translation_distance=1,ra
 
         # Avoid sending the extra paramters multiple times by creating partial
 
-        tmp = partial(f,SN_limits=SN_limits,translation_distance=translation_distance,radius_limits=radius_limits)
+        tmp = partial(f,SN_limits=SN_limits,translation_distance=translation_distance,radius_limits=radius_limits,use_movie_parameters=use_movie_parameters)
 
         # Do some load balancing
 
