@@ -17,13 +17,40 @@ def get_image_generator_movies():
     ### Define image generator
     image_generator = lambda : deeptrack.get_image_generator(image_parameters_function)
     return image_generator
+
+def get_default_image_generator_deeptrack(translation_distance = 5,SN_limits=[10,100],radius_limits=[1.5,3]):
+    """
+    Returns a default image genereator for deeptrack. Allows for some parameter tweaking.
+    """
+    import deeptrack
+    from numpy.random import randint, uniform, normal, choice
+    from math import pi
+
+    image_parameters_function = lambda : deeptrack.get_image_parameters(
+       particle_center_x_list=lambda : normal(0, translation_distance, translation_distance),
+       particle_center_y_list=lambda : normal(0, translation_distance, translation_distance),
+       particle_radius_list=lambda : uniform(radius_limits[0],radius_limits[1], 1),
+       particle_bessel_orders_list=lambda : [[randint(1, 3),], ],
+       particle_intensities_list=lambda : [[choice([-1, 1]) * uniform(.2, .6, 1), ], ],
+       image_half_size=lambda : 25,
+       image_background_level=lambda : uniform(.2, .8),
+       signal_to_noise_ratio=lambda : uniform(SN_limits[0], SN_limits[1]),
+       gradient_intensity=lambda : uniform(0, 1),
+       gradient_direction=lambda : uniform(-pi, pi),
+       ellipsoidal_orientation=lambda : uniform(-pi,pi,1 ),
+       ellipticity=lambda : 1)
+
+    ### Define image generator
+    image_generator = lambda : deeptrack.get_image_generator(image_parameters_function)
+
+    return image_generator
 def f(x,SN_limits=[10,100],translation_distance=5,radius_limits=[1.5,3],use_movie_parameters=False):
     import numpy as np
-    import feature_by_feature as fbf
+    #import feature_by_feature as fbf
     if use_movie_parameters:
         image_generator = get_image_generator_movies()
     else:
-        image_generator = fbf.get_default_image_generator_deeptrack(translation_distance=translation_distance,SN_limits=SN_limits,radius_limits=radius_limits) # change for various parameters
+        image_generator = get_default_image_generator_deeptrack(translation_distance=translation_distance,SN_limits=SN_limits,radius_limits=radius_limits) # change for various parameters
     targets = np.zeros((x,3))
 
     images = np.zeros((x,51,51))
