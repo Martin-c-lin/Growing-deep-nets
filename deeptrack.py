@@ -4,6 +4,106 @@ version 1.0 - 15 November 2018
  Saga Helgadottir, Aykut Argun & Giovanni Volpe
 http://www.softmatterlab.org
 '''
+x=0
+y=0
+def get_trajctory_x(gamma=0.2,sigma=1):
+    from numpy.random import normal
+    mu=0
+    global x
+    x+=-x*gamma+normal(mu,sigma,1)[0]
+    return x
+def get_trajctory_y(gamma=0.2,sigma=1):
+    from numpy.random import normal
+    mu=0
+    global y
+    y+=-y*gamma+normal(mu,sigma,1)[0]
+    return y
+
+def generate_trajectory_image(image_parameters):
+    """Generate image with particles.
+
+    Input:
+    image_parameters: list with the values of the image parameters in a dictionary:
+        image_parameters['Particle Center X List']
+        image_parameters['Particle Center Y List']
+        image_parameters['Particle Radius List']
+        image_parameters['Particle Bessel Orders List']
+        image_parameters['Particle Intensities List']
+        image_parameters['Image Half-Size']
+        image_parameters['Image Background Level']
+        image_parameters['Signal to Noise Ratio']
+        image_parameters['Gradient Intensity']
+        image_parameters['Gradient Direction']
+
+    Note: image_parameters is typically obained from the function get_image_parameters()
+
+    Output:
+    image: image of the particle [2D numpy array of real numbers betwen 0 and 1]
+    """
+
+    from numpy import meshgrid, arange, ones, zeros, sin, cos, sqrt, clip
+    from scipy.special import jv as bessel
+    from numpy.random import poisson as poisson
+
+    particle_center_x_list = image_parameters['Particle Center X List']
+    particle_center_y_list = image_parameters['Particle Center Y List']
+    particle_radius_list = image_parameters['Particle Radius List']
+    particle_bessel_orders_list = image_parameters['Particle Bessel Orders List']
+    particle_intensities_list = image_parameters['Particle Intensities List']
+    image_half_size = image_parameters['Image Half-Size']
+    image_background_level = image_parameters['Image Background Level']
+    signal_to_noise_ratio = image_parameters['Signal to Noise Ratio']
+    gradient_intensity = image_parameters['Gradient Intensity']
+    gradient_direction = image_parameters['Gradient Direction']
+
+    ### CALCULATE IMAGE PARAMETERS
+    # calculate image full size
+    image_size = image_half_size * 2 + 1
+
+    # calculate matrix coordinates from the center of the image
+    image_coordinate_x, image_coordinate_y = meshgrid(arange(-image_half_size, image_half_size + 1),
+                                                      arange(-image_half_size, image_half_size + 1),
+                                                      sparse=False,
+                                                      indexing='ij')
+
+    ### CALCULATE BACKGROUND
+    # initialize the image at the background level
+    image_background = ones((image_size, image_size)) * image_background_level
+
+    # add gradient to image background
+    if gradient_intensity!=0:
+        image_background = image_background + gradient_intensity * (image_coordinate_x * sin(gradient_direction) +
+                                                                    image_coordinate_y * cos(gradient_direction) ) / (sqrt(2) * image_size)
+
+    ### CALCULATE IMAGE PARTICLES
+    center_x = []
+    center_y = []
+    image_particles = zeros((image_size, image_size))
+    for particle_radius, particle_bessel_orders, particle_intensities in zip(particle_radius_list, particle_bessel_orders_list, particle_intensities_list):
+        # calculate the radial distance from the center of the particle
+        # normalized by the particle radius
+        particle_center_x = get_trajctory_x()
+        particle_center_y = get_trajctory_y()
+        center_x.append(particle_center_x)
+        center_y.append(particle_center_y)
+
+        radial_distance_from_particle = sqrt((image_coordinate_x - particle_center_x)**2
+                                         + (image_coordinate_y - particle_center_y)**2
+                                         + .001**2) / particle_radius
+
+        # calculate particle profile
+        for particle_bessel_order, particle_intensity in zip(particle_bessel_orders, particle_intensities):
+            image_particle = 4 * particle_bessel_order**2.5 * (bessel(particle_bessel_order, radial_distance_from_particle) / radial_distance_from_particle)**2
+            image_particles = image_particles + particle_intensity * image_particle
+
+    # calculate image without noise as background image plus particle image
+    image_particles_without_noise = clip(image_background + image_particles, 0, 1)
+
+    ### ADD NOISE
+    image_particles_with_noise = poisson(image_particles_without_noise * signal_to_noise_ratio**2) / signal_to_noise_ratio**2
+
+    return image_particles_with_noise,particle_center_x,particle_center_y
+
 
 def get_image_parameters(
     particle_center_x_list=lambda : [0, ],
@@ -48,6 +148,7 @@ def get_image_parameters(
     """
 
     image_parameters = {}
+
     image_parameters['Particle Center X List'] = particle_center_x_list()
     image_parameters['Particle Center Y List'] = particle_center_y_list()
     image_parameters['Particle Radius List'] = particle_radius_list()
