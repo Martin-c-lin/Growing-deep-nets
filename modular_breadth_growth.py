@@ -335,7 +335,7 @@ def build_modular_breadth_model(
         save_networks=True,
         residual_connections=False,
         train_network=True,
-        use_movie_parameters=False,
+        parameter_function=0,
         ):
     """
     residual_connections - Used to connect the first non-zero convolutional
