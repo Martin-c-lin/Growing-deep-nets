@@ -82,6 +82,7 @@ def get_image_parameters_optimized_vesicles():
 def get_exp_image_generator():
     from numpy.random import randint, uniform, normal, choice
     from math import pi
+    import deeptrack
 
     image_parameters_function = lambda : deeptrack.get_image_parameters(
        particle_center_x_list=lambda : normal(0, 5, 1),
