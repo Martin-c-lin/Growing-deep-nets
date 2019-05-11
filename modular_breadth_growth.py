@@ -30,7 +30,7 @@ def reformat_images_res_net(images,new_sizes):
         prev_images = final_images
         res.append(final_images)
     return res
-def modular_breadth_network_start(conv_layers_sizes,dense_layers_sizes,input_shape=(51,51,1)):
+def modular_breadth_network_start(conv_layers_sizes,dense_layers_sizes,input_shape=(51,51,1),extra_pooling=0):
     """
     Function which creates the firs part of a breadthwise grown network
     """
@@ -52,7 +52,17 @@ def modular_breadth_network_start(conv_layers_sizes,dense_layers_sizes,input_sha
                 new_conv_layer = layers.Conv2D(conv_layers_sizes[i],(3,3),activation='relu',name=layer_name)(new_conv_layer)
             new_conv_layer = layers.MaxPooling2D((2,2))(new_conv_layer)# add pooling
             conv_layers.append(new_conv_layer)
-        conv_output = layers.Flatten()(new_conv_layer)
+        if extra_pooling==1:
+            # Add extra pooling to decrease number of parameters
+            tmp = layers.MaxPooling2D((2,2))(new_conv_layer)
+            conv_output = layers.Flatten()(tmp)
+        elif extra_pooling==2:
+            tmp = layers.Conv2D(int(conv_layers_sizes[-1]/2),(3,3),activation='relu',name='auxiliary_classifier_conv')(new_conv_layer)
+            tmp = layers.MaxPooling2D((2,2),name='auxiliary_classifier_pooling')(tmp)
+            conv_output = layers.Flatten()(tmp)
+        else:
+            conv_output = layers.Flatten()(new_conv_layer)
+
     else:
         # No convolutional layers in model
         conv_output = layers.Flatten()(input_tensor)
@@ -336,6 +346,7 @@ def build_modular_breadth_model(
         residual_connections=False,
         train_network=True,
         parameter_function=0,
+        extra_pooling=0,
         ):
     """
     residual_connections - Used to connect the first non-zero convolutional
@@ -348,7 +359,7 @@ def build_modular_breadth_model(
     output_layers = [] # list of all output layers in model, used for training
     # all layers at once
     # Create first network
-    network,input_tensor,conv_layers_list,dense_layers_list,final_output = modular_breadth_network_start(conv_layers_sizes[0],dense_layers_sizes[0])
+    network,input_tensor,conv_layers_list,dense_layers_list,final_output = modular_breadth_network_start(conv_layers_sizes[0],dense_layers_sizes[0],extra_pooling=extra_pooling)
     output_layers.append(final_output)
     # compile and verify appearence
     nbr_images_to_evaluate = 1000
@@ -367,7 +378,7 @@ def build_modular_breadth_model(
             verbose=verbose,
             SN_limits=SN_limits,
             translation_distance=translation_distance,
-            use_movie_parameters=use_movie_parameters,
+            parameter_function=parameter_function,
             )
         freeze_all_layers(network)
         if(save_networks):
@@ -401,9 +412,11 @@ def build_modular_breadth_model(
                 verbose=verbose,
                 SN_limits=SN_limits,
                 translation_distance=translation_distance,
-                use_movie_parameters=use_movie_parameters,
+                parameter_function=parameter_function,
                 )
-            freeze_all_layers(network)
+            freeze_all_layers(network) # migth complain about this, no worries
+            network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
+
             # Save network
             if save_networks:
                 network.save(model_path+"network_no"+str(model_idx)+".h5")
