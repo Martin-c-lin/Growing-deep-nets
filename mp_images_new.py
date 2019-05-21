@@ -79,6 +79,42 @@ def get_image_parameters_optimized_vesicles():
     image_parameters['Ellipticity'] = 1
 
     return lambda:image_parameters
+def get_image_parameters_multi_particle():
+    ### Define image properties
+    #%matplotlib inline
+    from numpy.random import randint, uniform, normal, choice
+    from math import pi
+    import deeptrack
+
+
+    particle_number = 4
+    first_particle_range = 20
+    other_particle_range = 50
+    particle_distance = 15
+
+    (particles_center_x, particles_center_y) = deeptrack.particle_positions(particle_number, first_particle_range, other_particle_range, particle_distance)
+    image_parameters = {}
+
+    image_parameters['Particle Center X List'] = particles_center_x
+    image_parameters['Particle Center Y List'] = particles_center_y
+    image_parameters['Particle Radius List'] = uniform(1.5, 3, particle_number) # increased range from 2,3 to 1,4 for Surperior generalization
+    image_parameters['Particle Bessel Orders List'] = [[randint(1,3), ],
+                                                       [randint(1,3), ],
+                                                       [randint(1,3), ],
+                                                       [randint(1,3), ]]
+    image_parameters['Particle Intensities List'] = [[choice([-1,1])*uniform(0.2, 0.6, 1), ],
+                                                     [choice([-1,1])*uniform(0.2, 0.6, 1), ],
+                                                     [choice([-1,1])*uniform(0.2, 0.6, 1), ],
+                                                     [choice([-1,1])*uniform(0.2, 0.6, 1), ]]
+    image_parameters['Image Half-Size'] = 25
+    image_parameters['Image Background Level'] = uniform(.2, .8)
+    image_parameters['Signal to Noise Ratio'] = uniform(4, 15) # May bring trouble for the algorithm...
+    image_parameters['Gradient Intensity'] = uniform(0, 1)
+    image_parameters['Gradient Direction'] = uniform(-pi, pi)
+    image_parameters['Ellipsoid Orientation'] = uniform(-pi, pi, particle_number)
+    image_parameters['Ellipticity'] = 1
+
+    return lambda:image_parameters
 def get_exp_image_generator():
     from numpy.random import randint, uniform, normal, choice
     from math import pi
@@ -101,9 +137,14 @@ def get_exp_image_generator():
     ### Define image generator
     image_generator = lambda : deeptrack.get_image_generator(image_parameters_function)
     return image_generator
-def get_vesicle_image_generator():
+def get_multiparticle_genertator():
+    # Used for multiparticle tracking
     import deeptrack
-
+    image_generator = lambda : deeptrack.get_image_generator(get_image_parameters_multi_particle())
+    return image_generator
+def get_vesicle_image_generator():
+    # Used for vesicles
+    import deeptrack
     image_generator = lambda : deeptrack.get_image_generator(get_image_parameters_optimized_vesicles())
     return image_generator
 
@@ -117,6 +158,8 @@ def f(x,SN_limits=[10,100],translation_distance=5,radius_limits=[1.5,3],paramete
         image_generator = get_image_generator_movies()
     elif parameter_function==3:
         image_generator = get_exp_image_generator()
+    elif parameter_function==4:
+        image_generator = get_multiparticle_genertator()
     targets = np.zeros((x,3))
 
     images = np.zeros((x,51,51))
