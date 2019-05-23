@@ -98,18 +98,18 @@ def get_image_parameters_multi_particle():
     image_parameters['Particle Center X List'] = particles_center_x
     image_parameters['Particle Center Y List'] = particles_center_y
     image_parameters['Particle Radius List'] = uniform(1.5, 3, particle_number) # increased range from 2,3 to 1,4 for Surperior generalization
-    image_parameters['Particle Bessel Orders List'] = [[randint(1,3), ],
-                                                       [randint(1,3), ],
-                                                       [randint(1,3), ],
-                                                       [randint(1,3), ]]
+    image_parameters['Particle Bessel Orders List'] = [[1, ],
+                                                       [1, ],
+                                                       [1, ],
+                                                       [1, ]]
     image_parameters['Particle Intensities List'] = [[choice([-1,1])*uniform(0.2, 0.6, 1), ],
                                                      [choice([-1,1])*uniform(0.2, 0.6, 1), ],
                                                      [choice([-1,1])*uniform(0.2, 0.6, 1), ],
                                                      [choice([-1,1])*uniform(0.2, 0.6, 1), ]]
     image_parameters['Image Half-Size'] = 25
     image_parameters['Image Background Level'] = uniform(.2, .8)
-    image_parameters['Signal to Noise Ratio'] = uniform(4, 15) # May bring trouble for the algorithm...
-    image_parameters['Gradient Intensity'] = uniform(0, 1)
+    image_parameters['Signal to Noise Ratio'] = uniform(2, 10) # May bring trouble for the algorithm...
+    image_parameters['Gradient Intensity'] = uniform(0, 0.4)
     image_parameters['Gradient Direction'] = uniform(-pi, pi)
     image_parameters['Ellipsoid Orientation'] = uniform(-pi, pi, particle_number)
     image_parameters['Ellipticity'] = 1
