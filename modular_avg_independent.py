@@ -60,7 +60,10 @@ def independent_avg_modular_deeptrack_L1(# bad name
             # Construct the next output node
             next_flattened = layers.Flatten()(next_node)
             flattened_list.append(next_flattened)
-            next_output = layers.Concatenate(axis=-1)(flattened_list)
+            # Can't concatenate a single layer
+            if(len(flattened_list)>1):
+                next_output = layers.Concatenate(axis=-1)(flattened_list)
+
             next_output = layers.Dense(3)(next_output)
             output_list.append(next_output)
             # Construct and compile network
@@ -91,7 +94,10 @@ def independent_avg_modular_deeptrack_L1(# bad name
         if(save_networks):
             network.save(model_path+"L1_"+str((i+1)*nbr_nodes_added)+"F.h5")
     # Create final output using all the output layers and averaging them
-    avg_out = layers.average(output_list)
+    if(len(output_list)>1):
+        avg_out = layers.average(output_list)
+    else:
+        avg_out = output_list[0]
     network = models.Model(input_tensor,avg_out)
     network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
     print('final network architecture')
@@ -202,7 +208,7 @@ def build_full_independent_modular_avg_network(
     layer_types,
     input_shape=(51,51,1),
     output_shape=3,
-    nbr_nodes_added=1,
+    nbr_nodes_added=8,
     sample_sizes=(8, 32, 128, 512, 1024),
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
@@ -222,12 +228,19 @@ def build_full_independent_modular_avg_network(
     if len(layer_sizes)<1:
         print("Too few layer sizes given")
         return 0
+    import numpy as np
+
+    if len(np.shape(nbr_nodes_added))==0:
+        nbr_nodes_added = nbr_nodes_added * np.ones(len(layer_sizes))
+    elif len(nbr_nodes_added)<len(layer_sizes):
+        nbr_nodes_added = nbr_nodes_added[0] * np.ones(len(layer_sizes))
+
     network,node_list,output_list,flattened_list,input_tensor=independent_avg_modular_deeptrack_L1(
         layer_size=layer_sizes[0],
         train_generator=train_generator,
         input_shape=input_shape,
         output_shape=output_shape,
-        nbr_nodes_added=nbr_nodes_added,
+        nbr_nodes_added=int(nbr_nodes_added[0]),
         sample_sizes=sample_sizes,
         iteration_numbers=iteration_numbers,
         verbose=verbose,
@@ -247,7 +260,7 @@ def build_full_independent_modular_avg_network(
             output_list=output_list,
             input_tensor=input_tensor,
             layer_no=idx+1,
-            nbr_nodes_added=nbr_nodes_added,
+            nbr_nodes_added=int(nbr_nodes_added[idx]),
             sample_sizes=sample_sizes,
             iteration_numbers=iteration_numbers,
             verbose=verbose,

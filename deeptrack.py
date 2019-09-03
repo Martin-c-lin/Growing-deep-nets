@@ -4,64 +4,21 @@ version 1.0 - 15 November 2018
  Saga Helgadottir, Aykut Argun & Giovanni Volpe
 http://www.softmatterlab.org
 '''
-
-def get_image_parameters(
-    particle_center_x_list=lambda : [0, ],
-    particle_center_y_list=lambda : [0, ],
-    particle_radius_list=lambda : [3, ],
-    particle_bessel_orders_list=lambda : [[1, ], ],
-    particle_intensities_list=lambda : [[.5, ], ],
-    image_half_size=lambda : 25,
-    image_background_level=lambda : .5,
-    signal_to_noise_ratio=lambda : 30,
-    gradient_intensity=lambda : .2,
-    gradient_direction=lambda : 0):
-    """Get image parameters.
-
-    Inputs:
-    particle_center_x_list: x-centers of the particles [px, list of real numbers]
-    particle_center_y_list: y-centers of the particles [px, list of real numbers]
-    particle_radius_list: radii of the particles [px, list of real numbers]
-    particle_bessel_orders_list: Bessel orders of the particles [list (of lists) of positive integers]
-    particle_intensities_list: intensities of the particles [list (of lists) of real numbers, normalized to 1]
-    image_half_size: half size of the image in pixels [px, positive integer]
-    image_background_level: background level [real number normalized to 1]
-    signal_to_noise_ratio: signal to noise ratio [positive real number]
-    gradient_intensity: gradient intensity [real number normalized to 1]
-    gradient_direction: gradient angle [rad, real number]
-
-    Note: particle_center_x, particle_center_x, particle_radius,
-    particle_bessel_order, particle_intensity must have the same length.
-
-    Output:
-    image_parameters: list with the values of the image parameters in a dictionary:
-        image_parameters['Particle Center X List']
-        image_parameters['Particle Center Y List']
-        image_parameters['Particle Radius List']
-        image_parameters['Particle Bessel Orders List']
-        image_parameters['Particle Intensities List']
-        image_parameters['Image Half-Size']
-        image_parameters['Image Background Level']
-        image_parameters['Signal to Noise Ratio']
-        image_parameters['Gradient Intensity']
-        image_parameters['Gradient Direction']
-    """
-
-    image_parameters = {}
-    image_parameters['Particle Center X List'] = particle_center_x_list()
-    image_parameters['Particle Center Y List'] = particle_center_y_list()
-    image_parameters['Particle Radius List'] = particle_radius_list()
-    image_parameters['Particle Bessel Orders List'] = particle_bessel_orders_list()
-    image_parameters['Particle Intensities List'] = particle_intensities_list()
-    image_parameters['Image Half-Size'] = image_half_size()
-    image_parameters['Image Background Level'] = image_background_level()
-    image_parameters['Signal to Noise Ratio'] = signal_to_noise_ratio()
-    image_parameters['Gradient Intensity'] = gradient_intensity()
-    image_parameters['Gradient Direction'] = gradient_direction()
-
-    return image_parameters
-
-def generate_image(image_parameters):
+x=0
+y=0
+def get_trajctory_x(gamma=0.2,sigma=1):
+    from numpy.random import normal
+    mu=0
+    global x
+    x+=-x*gamma+normal(mu,sigma,1)[0]
+    return x
+def get_trajctory_y(gamma=0.2,sigma=1):
+    from numpy.random import normal
+    mu=0
+    global y
+    y+=-y*gamma+normal(mu,sigma,1)[0]
+    return y
+def generate_trajectory_image(image_parameters):
     """Generate image with particles.
 
     Input:
@@ -76,6 +33,8 @@ def generate_image(image_parameters):
         image_parameters['Signal to Noise Ratio']
         image_parameters['Gradient Intensity']
         image_parameters['Gradient Direction']
+        image_parameters['Ellipsoid Orientation']
+        image_parameters['Ellipticity']
 
     Note: image_parameters is typically obained from the function get_image_parameters()
 
@@ -83,7 +42,7 @@ def generate_image(image_parameters):
     image: image of the particle [2D numpy array of real numbers betwen 0 and 1]
     """
 
-    from numpy import meshgrid, arange, ones, zeros, sin, cos, sqrt, clip
+    from numpy import meshgrid, arange, ones, zeros, sin, cos, sqrt, clip, array
     from scipy.special import jv as bessel
     from numpy.random import poisson as poisson
 
@@ -97,6 +56,8 @@ def generate_image(image_parameters):
     signal_to_noise_ratio = image_parameters['Signal to Noise Ratio']
     gradient_intensity = image_parameters['Gradient Intensity']
     gradient_direction = image_parameters['Gradient Direction']
+    ellipsoidal_orientation_list = image_parameters['Ellipsoid Orientation']
+    ellipticity = image_parameters['Ellipticity']
 
     ### CALCULATE IMAGE PARAMETERS
     # calculate image full size
@@ -119,16 +80,265 @@ def generate_image(image_parameters):
 
     ### CALCULATE IMAGE PARTICLES
     image_particles = zeros((image_size, image_size))
-    for particle_center_x, particle_center_y, particle_radius, particle_bessel_orders, particle_intensities in zip(particle_center_x_list, particle_center_y_list, particle_radius_list, particle_bessel_orders_list, particle_intensities_list):
+    for particle_radius, particle_bessel_orders, particle_intensities, ellipsoidal_orientation in zip(particle_radius_list, particle_bessel_orders_list, particle_intensities_list, ellipsoidal_orientation_list):
+        # calculate the radial distance from the center of the particle
+        # normalized by the particle radius
+        particle_center_x = get_trajctory_x()
+        particle_center_y = get_trajctory_y()
+        radial_distance_from_particle = sqrt((image_coordinate_x - particle_center_x)**2
+                                         + (image_coordinate_y - particle_center_y)**2
+                                         + .001**2) / particle_radius
+
+        # for elliptical particles
+        rotated_distance_x = (image_coordinate_x - particle_center_x)*cos(ellipsoidal_orientation) + (image_coordinate_y - particle_center_y)*sin(ellipsoidal_orientation)
+        rotated_distance_y = -(image_coordinate_x - particle_center_x)*sin(ellipsoidal_orientation) + (image_coordinate_y - particle_center_y)*cos(ellipsoidal_orientation)
+
+
+        elliptical_distance_from_particle = sqrt((rotated_distance_x)**2
+                                         + (rotated_distance_y / ellipticity)**2
+                                         + .001**2) / particle_radius
+
+        # calculate particle profile
+        for particle_bessel_order, particle_intensity in zip(particle_bessel_orders, particle_intensities):
+            image_particle = 4 * particle_bessel_order**2.5 * (bessel(particle_bessel_order, elliptical_distance_from_particle) / elliptical_distance_from_particle)**2
+            image_particles = image_particles + particle_intensity * image_particle
+
+    # calculate image without noise as background image plus particle image
+    image_particles_without_noise = clip(image_background + image_particles, 0, 1)
+
+    ### ADD NOISE
+    image_particles_with_noise = poisson(image_particles_without_noise * signal_to_noise_ratio**2) / signal_to_noise_ratio**2
+
+    return image_particles_with_noise,particle_center_x,particle_center_y
+# def generate_trajectory_image(image_parameters): # may not work anymore
+#     """Generate image with particles.
+#
+#     Input:
+#     image_parameters: list with the values of the image parameters in a dictionary:
+#         image_parameters['Particle Center X List']
+#         image_parameters['Particle Center Y List']
+#         image_parameters['Particle Radius List']
+#         image_parameters['Particle Bessel Orders List']
+#         image_parameters['Particle Intensities List']
+#         image_parameters['Image Half-Size']
+#         image_parameters['Image Background Level']
+#         image_parameters['Signal to Noise Ratio']
+#         image_parameters['Gradient Intensity']
+#         image_parameters['Gradient Direction']
+#
+#     Note: image_parameters is typically obained from the function get_image_parameters()
+#
+#     Output:
+#     image: image of the particle [2D numpy array of real numbers betwen 0 and 1]
+#     """
+#
+#     from numpy import meshgrid, arange, ones, zeros, sin, cos, sqrt, clip
+#     from scipy.special import jv as bessel
+#     from numpy.random import poisson as poisson
+#
+#     particle_center_x_list = image_parameters['Particle Center X List']
+#     particle_center_y_list = image_parameters['Particle Center Y List']
+#     particle_radius_list = image_parameters['Particle Radius List']
+#     particle_bessel_orders_list = image_parameters['Particle Bessel Orders List']
+#     particle_intensities_list = image_parameters['Particle Intensities List']
+#     image_half_size = image_parameters['Image Half-Size']
+#     image_background_level = image_parameters['Image Background Level']
+#     signal_to_noise_ratio = image_parameters['Signal to Noise Ratio']
+#     gradient_intensity = image_parameters['Gradient Intensity']
+#     gradient_direction = image_parameters['Gradient Direction']
+#
+#     ### CALCULATE IMAGE PARAMETERS
+#     # calculate image full size
+#     image_size = image_half_size * 2 + 1
+#
+#     # calculate matrix coordinates from the center of the image
+#     image_coordinate_x, image_coordinate_y = meshgrid(arange(-image_half_size, image_half_size + 1),
+#                                                       arange(-image_half_size, image_half_size + 1),
+#                                                       sparse=False,
+#                                                       indexing='ij')
+#
+#     ### CALCULATE BACKGROUND
+#     # initialize the image at the background level
+#     image_background = ones((image_size, image_size)) * image_background_level
+#
+#     # add gradient to image background
+#     if gradient_intensity!=0:
+#         image_background = image_background + gradient_intensity * (image_coordinate_x * sin(gradient_direction) +
+#                                                                     image_coordinate_y * cos(gradient_direction) ) / (sqrt(2) * image_size)
+#
+#     ### CALCULATE IMAGE PARTICLES
+#     center_x = []
+#     center_y = []
+#     image_particles = zeros((image_size, image_size))
+#     for particle_radius, particle_bessel_orders, particle_intensities in zip(particle_radius_list, particle_bessel_orders_list, particle_intensities_list):
+#         # calculate the radial distance from the center of the particle
+#         # normalized by the particle radius
+#         particle_center_x = get_trajctory_x()
+#         particle_center_y = get_trajctory_y()
+#         center_x.append(particle_center_x)
+#         center_y.append(particle_center_y)
+#
+#         radial_distance_from_particle = sqrt((image_coordinate_x - particle_center_x)**2
+#                                          + (image_coordinate_y - particle_center_y)**2
+#                                          + .001**2) / particle_radius
+#
+#         # calculate particle profile
+#         for particle_bessel_order, particle_intensity in zip(particle_bessel_orders, particle_intensities):
+#             image_particle = 4 * particle_bessel_order**2.5 * (bessel(particle_bessel_order, radial_distance_from_particle) / radial_distance_from_particle)**2
+#             image_particles = image_particles + particle_intensity * image_particle
+#
+#     # calculate image without noise as background image plus particle image
+#     image_particles_without_noise = clip(image_background + image_particles, 0, 1)
+#
+#     ### ADD NOISE
+#     image_particles_with_noise = poisson(image_particles_without_noise * signal_to_noise_ratio**2) / signal_to_noise_ratio**2
+#
+#     return image_particles_with_noise,particle_center_x,particle_center_y
+def get_image_parameters(
+    particle_center_x_list=lambda : [0, ],
+    particle_center_y_list=lambda : [0, ],
+    particle_radius_list=lambda : [3, ],
+    particle_bessel_orders_list=lambda : [[1, ], ],
+    particle_intensities_list=lambda : [[.5, ], ],
+    image_half_size=lambda : 25,
+    image_background_level=lambda : .5,
+    signal_to_noise_ratio=lambda : 30,
+    gradient_intensity=lambda : .2,
+    gradient_direction=lambda : 0,
+    ellipsoidal_orientation=lambda : [0, ],
+    ellipticity=lambda : 1):
+    """Get image parameters.
+
+    Inputs:
+    particle_center_x_list: x-centers of the particles [px, list of real numbers]
+    particle_center_y_list: y-centers of the particles [px, list of real numbers]
+    particle_radius_list: radii of the particles [px, list of real numbers]
+    particle_bessel_orders_list: Bessel orders of the particles [list (of lists) of positive integers]
+    particle_intensities_list: intensities of the particles [list (of lists) of real numbers, normalized to 1]
+    image_half_size: half size of the image in pixels [px, positive integer]
+    image_background_level: background level [real number normalized to 1]
+    signal_to_noise_ratio: signal to noise ratio [positive real number]
+    gradient_intensity: gradient intensity [real number normalized to 1]
+    gradient_direction: gradient angle [rad, real number]
+    ellipsoidal_orientation: Orientation of elliptical particles [rad, real number]
+    ellipticity: shape of the particles, from spherical to elliptical [real number]
+
+    Note: particle_center_x, particle_center_x, particle_radius,
+    particle_bessel_order, particle_intensity, ellipsoidal_orientation must have the same length.
+
+    Output:
+    image_parameters: list with the values of the image parameters in a dictionary:
+        image_parameters['Particle Center X List']
+        image_parameters['Particle Center Y List']
+        image_parameters['Particle Radius List']
+        image_parameters['Particle Bessel Orders List']
+        image_parameters['Particle Intensities List']
+        image_parameters['Image Half-Size']
+        image_parameters['Image Background Level']
+        image_parameters['Signal to Noise Ratio']
+        image_parameters['Gradient Intensity']
+        image_parameters['Gradient Direction']
+        image_parameters['Ellipsoid Orientation']
+        image_parameters['Ellipticity']
+    """
+
+    image_parameters = {}
+    image_parameters['Particle Center X List'] = particle_center_x_list()
+    image_parameters['Particle Center Y List'] = particle_center_y_list()
+    image_parameters['Particle Radius List'] = particle_radius_list()
+    image_parameters['Particle Bessel Orders List'] = particle_bessel_orders_list()
+    image_parameters['Particle Intensities List'] = particle_intensities_list()
+    image_parameters['Image Half-Size'] = image_half_size()
+    image_parameters['Image Background Level'] = image_background_level()
+    image_parameters['Signal to Noise Ratio'] = signal_to_noise_ratio()
+    image_parameters['Gradient Intensity'] = gradient_intensity()
+    image_parameters['Gradient Direction'] = gradient_direction()
+    image_parameters['Ellipsoid Orientation'] = ellipsoidal_orientation()
+    image_parameters['Ellipticity'] = ellipticity()
+
+    return image_parameters
+
+def generate_image(image_parameters):
+    """Generate image with particles.
+
+    Input:
+    image_parameters: list with the values of the image parameters in a dictionary:
+        image_parameters['Particle Center X List']
+        image_parameters['Particle Center Y List']
+        image_parameters['Particle Radius List']
+        image_parameters['Particle Bessel Orders List']
+        image_parameters['Particle Intensities List']
+        image_parameters['Image Half-Size']
+        image_parameters['Image Background Level']
+        image_parameters['Signal to Noise Ratio']
+        image_parameters['Gradient Intensity']
+        image_parameters['Gradient Direction']
+        image_parameters['Ellipsoid Orientation']
+        image_parameters['Ellipticity']
+
+    Note: image_parameters is typically obained from the function get_image_parameters()
+
+    Output:
+    image: image of the particle [2D numpy array of real numbers betwen 0 and 1]
+    """
+
+    from numpy import meshgrid, arange, ones, zeros, sin, cos, sqrt, clip, array
+    from scipy.special import jv as bessel
+    from numpy.random import poisson as poisson
+
+    particle_center_x_list = image_parameters['Particle Center X List']
+    particle_center_y_list = image_parameters['Particle Center Y List']
+    particle_radius_list = image_parameters['Particle Radius List']
+    particle_bessel_orders_list = image_parameters['Particle Bessel Orders List']
+    particle_intensities_list = image_parameters['Particle Intensities List']
+    image_half_size = image_parameters['Image Half-Size']
+    image_background_level = image_parameters['Image Background Level']
+    signal_to_noise_ratio = image_parameters['Signal to Noise Ratio']
+    gradient_intensity = image_parameters['Gradient Intensity']
+    gradient_direction = image_parameters['Gradient Direction']
+    ellipsoidal_orientation_list = image_parameters['Ellipsoid Orientation']
+    ellipticity = image_parameters['Ellipticity']
+
+    ### CALCULATE IMAGE PARAMETERS
+    # calculate image full size
+    image_size = image_half_size * 2 + 1
+
+    # calculate matrix coordinates from the center of the image
+    image_coordinate_x, image_coordinate_y = meshgrid(arange(-image_half_size, image_half_size + 1),
+                                                      arange(-image_half_size, image_half_size + 1),
+                                                      sparse=False,
+                                                      indexing='ij')
+
+    ### CALCULATE BACKGROUND
+    # initialize the image at the background level
+    image_background = ones((image_size, image_size)) * image_background_level
+
+    # add gradient to image background
+    if gradient_intensity!=0:
+        image_background = image_background + gradient_intensity * (image_coordinate_x * sin(gradient_direction) +
+                                                                    image_coordinate_y * cos(gradient_direction) ) / (sqrt(2) * image_size)
+
+    ### CALCULATE IMAGE PARTICLES
+    image_particles = zeros((image_size, image_size))
+    for particle_center_x, particle_center_y, particle_radius, particle_bessel_orders, particle_intensities, ellipsoidal_orientation in zip(particle_center_x_list, particle_center_y_list, particle_radius_list, particle_bessel_orders_list, particle_intensities_list, ellipsoidal_orientation_list):
         # calculate the radial distance from the center of the particle
         # normalized by the particle radius
         radial_distance_from_particle = sqrt((image_coordinate_x - particle_center_x)**2
                                          + (image_coordinate_y - particle_center_y)**2
                                          + .001**2) / particle_radius
 
+        # for elliptical particles
+        rotated_distance_x = (image_coordinate_x - particle_center_x)*cos(ellipsoidal_orientation) + (image_coordinate_y - particle_center_y)*sin(ellipsoidal_orientation)
+        rotated_distance_y = -(image_coordinate_x - particle_center_x)*sin(ellipsoidal_orientation) + (image_coordinate_y - particle_center_y)*cos(ellipsoidal_orientation)
+
+
+        elliptical_distance_from_particle = sqrt((rotated_distance_x)**2
+                                         + (rotated_distance_y / ellipticity)**2
+                                         + .001**2) / particle_radius
+
         # calculate particle profile
         for particle_bessel_order, particle_intensity in zip(particle_bessel_orders, particle_intensities):
-            image_particle = 4 * particle_bessel_order**2.5 * (bessel(particle_bessel_order, radial_distance_from_particle) / radial_distance_from_particle)**2
+            image_particle = 4 * particle_bessel_order**2.5 * (bessel(particle_bessel_order, elliptical_distance_from_particle) / elliptical_distance_from_particle)**2
             image_particles = image_particles + particle_intensity * image_particle
 
     # calculate image without noise as background image plus particle image
@@ -160,6 +370,8 @@ def get_image_generator(image_parameters_function=lambda : get_image_parameters(
         image_parameters['Signal to Noise Ratio']
         image_parameters['Gradient Intensity']
         image_parameters['Gradient Direction']
+        image_parameters['Ellipsoid Orientation']
+        image_parameters['Ellipticity']
     """
 
     image_number = 0
@@ -195,6 +407,8 @@ def plot_sample_image(image, image_parameters, figsize=(15,5)):
     signal_to_noise_ratio = image_parameters['Signal to Noise Ratio']
     gradient_intensity = image_parameters['Gradient Intensity']
     gradient_direction = image_parameters['Gradient Direction']
+    ellipsoidal_orientation_list = image_parameters['Ellipsoid Orientation']
+    ellipticity = image_parameters['Ellipticity']
 
     plt.figure(figsize=figsize)
 
@@ -211,6 +425,8 @@ def plot_sample_image(image, image_parameters, figsize=(15,5)):
     plt.text(0, .7, 'particle radius = %5.2f px' % particle_radius_list[0], fontsize=16)
     plt.text(0, .6, 'Bessel order = %5.2f' % particle_bessel_orders_list[0][0], fontsize=16)
     plt.text(0, .5, 'particle intensity = %5.2f' % particle_intensities_list[0][0], fontsize=16)
+    plt.text(0, .4, 'ellipsoidal_orientation = %5.2f' % ellipsoidal_orientation_list[0], fontsize=16)
+    plt.text(0, .3, 'ellipticity = %5.2f' % ellipticity, fontsize=16)
     plt.axis('off')
 
     plt.subplot(1, 3, 3)
@@ -678,12 +894,14 @@ def train_deep_learning_network(
     return training_history
 def train_deep_learning_network_mp(
     network,
-    translation_distance=5,
+    translation_distance=1,
     SN_limits = [10,100],
-    radius_limits=[1.5,3], # 
+    radius_limits=[1.5,3], #
     sample_sizes = (32, 128, 512, 2048),
     iteration_numbers = (3001, 2001, 1001, 101),
-    verbose=True):
+    verbose=True,
+    nbr_outputs=1,
+    parameter_function=0):
     """Train a deep learning network.
 
     Input:
@@ -715,33 +933,38 @@ def train_deep_learning_network_mp(
             max_nbr_images = max_images - (max_images%sample_size)
             image_batches = [] # Images to get in each bunch
             # Calculate appropriate image batches which are all dicisible by sample size
-            for n in range(round(N/max_nbr_images)+1):
+            for n in range(int(N/max_nbr_images)+1):
                 if n ==0:
                     image_batches.append(N%max_nbr_images)
                 else:
                     image_batches.append(max_nbr_images)
+            #print(max_nbr_images,sample_size,iteration_number,image_batches,int(N/max_nbr_images))
             # loop over the image batches
             for images_to_get in image_batches:
                 images_total,targets_total = mp_images.get_images_mp(
                         images_to_get,
                         SN_limits=SN_limits,
-                        translation_distance=translation_distance
+                        translation_distance=translation_distance,
+                        parameter_function=parameter_function,
                         )
 
                 for iteration in range(round(images_to_get/sample_size)):
                     images =  images_total[iteration*sample_size:(iteration+1)*sample_size]
                     targets = targets_total[iteration*sample_size:(iteration+1)*sample_size]
-                    train_network_on_images(network,images,targets,iteration,training_history)
+                    train_network_on_images(network,images,targets,iteration,training_history,nbr_outputs)
 
                     if not(iteration%int(verbose**-1)):
                         mse = training_history['MSE'][-1]
                         mae = training_history['MAE'][-1]
                         iteration_time = training_history['Iteration Time'][-1]
-                        print('Sample size %6d   iteration number %6d   MSE %10.2f px^2   MAE %10.2f px   Time %10.2f ms' % (sample_size, iteration + 1, mse, mae, iteration_time * 1000))
-
+                        if nbr_outputs<=1:
+                            print('Sample size %6d   iteration number %6d   MSE %10.2f px^2   MAE %10.2f px   Time %10.2f ms' % (sample_size, iteration + 1, mse, mae, iteration_time * 1000))
+                        else:
+                            print('Sample size '+str(sample_size)+   ' iteration number '+str(iteration + 1)+' MSE '+ str(mse)+'px^2   MAE'+ str(mae) +'px   Time'+ str(iteration_time * 1000))
+                            print()
         return training_history
 
-def train_network_on_images(network,images,targets,iteration=1,training_history=None):
+def train_network_on_images(network,images,targets,iteration=1,training_history=None,nbr_outputs=1):
     """
     Train network for a single batch on a set of images
     """
@@ -752,19 +975,35 @@ def train_network_on_images(network,images,targets,iteration=1,training_history=
     sample_size = len(images)
     image_shape=images[0].shape
     half_image_size = round(image_shape[1]/2)
-    history = network.fit(images,
-                        targets,
-                        epochs=1,
-                        batch_size=sample_size,
-                        verbose=False)
-
+    if nbr_outputs<=1:
+        history = network.fit(images,
+                            targets,
+                            epochs=1,
+                            batch_size=sample_size,
+                            verbose=False)
+    else:
+        target_array = []
+        for i in range(nbr_outputs):
+            target_array.append(targets)
+        history = network.fit(images,
+                            target_array,
+                            epochs=1,
+                            batch_size=sample_size,
+                            verbose=False)
     # measure elapsed time during iteration
     iteration_time = time() - initial_time
 
     # record training history
-    mse = history.history['mean_squared_error'][0] * half_image_size**2
-    mae = history.history['mean_absolute_error'][0] * half_image_size
+    if nbr_outputs<=1:
 
+        mse = history.history['mean_squared_error'][0] * half_image_size**2
+        mae = history.history['mean_absolute_error'][0] * half_image_size
+    else:
+        mse = []
+        mae = []
+        for i in range(nbr_outputs):
+            mse.append(history.history['Output_'+str(i+1)+'_mean_squared_error'][0] * half_image_size**2)
+            mae.append(history.history['Output_'+str(i+1)+'_mean_absolute_error'][0] * half_image_size)
     training_history['Sample Size'].append(sample_size)
     training_history['Iteration Number'].append(iteration)
     training_history['Iteration Time'].append(iteration_time)
@@ -834,7 +1073,6 @@ def predict(network, image):
     predicted_position = half_image_size * predicted_position[0]
 
     return predicted_position
-
 def plot_prediction(image, image_parameters, predicted_position, figsize=(15, 5)):
     """Plot a sample image.
 
@@ -861,10 +1099,13 @@ def plot_prediction(image, image_parameters, predicted_position, figsize=(15, 5)
     signal_to_noise_ratio = image_parameters['Signal to Noise Ratio']
     gradient_intensity = image_parameters['Gradient Intensity']
     gradient_direction = image_parameters['Gradient Direction']
+    ellipsoidal_orientation_list = image_parameters['Ellipsoid Orientation']
+    ellipticity = image_parameters['Ellipticity']
 
     predicted_position_x = predicted_position[0]
     predicted_position_y = predicted_position[1]
     predicted_position_r = predicted_position[2]
+
 
     plt.figure(figsize=figsize)
 
@@ -878,11 +1119,14 @@ def plot_prediction(image, image_parameters, predicted_position, figsize=(15, 5)
     plt.ylabel('x (px)', fontsize=16)
 
     subplot131_handle = plt.subplot(1, 3, 2)
-    plt.text(0, .9, 'particle center x = %5.2f px' % particle_center_x_list[0], fontsize=16)
-    plt.text(0, .8, 'particle center y = %5.2f px' % particle_center_y_list[0], fontsize=16)
-    plt.text(0, .7, 'particle radius = %5.2f px' % particle_radius_list[0], fontsize=16)
-    plt.text(0, .6, 'Bessel order = %5.2f' % particle_bessel_orders_list[0][0], fontsize=16)
-    plt.text(0, .5, 'particle intensity = %5.2f' % particle_intensities_list[0][0], fontsize=16)
+    plt.text(0, 1, 'particle center x = %5.2f px' % particle_center_x_list[0], fontsize=16)
+    plt.text(0, .9, 'particle center y = %5.2f px' % particle_center_y_list[0], fontsize=16)
+    plt.text(0, .8, 'particle radius = %5.2f px' % particle_radius_list[0], fontsize=16)
+    plt.text(0, .7, 'Bessel order = %5.2f' % particle_bessel_orders_list[0][0], fontsize=16)
+    plt.text(0, .6, 'particle intensity = %5.2f' % particle_intensities_list[0][0], fontsize=16)
+    plt.text(0, .5, 'ellipsoidal_orientation = %5.2f' % ellipsoidal_orientation_list[0], fontsize=16)
+    plt.text(0, .4, 'ellipticity = %5.2f' % ellipticity, fontsize=16)
+
     plt.text(0, .3, 'predicted x = %5.2f px' % predicted_position_x, fontsize=16, color='#e6661a')
     plt.text(0, .2, 'predicted y = %5.2f px' % predicted_position_y, fontsize=16, color='#e6661a')
     plt.text(0, .1, 'predicted r = %5.2f px' % predicted_position_r, fontsize=16, color='#e6661a')
