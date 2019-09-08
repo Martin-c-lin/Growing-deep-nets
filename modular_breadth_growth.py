@@ -518,7 +518,7 @@ def ensamble_network_LBL(
             new_pooling_layer = layers.MaxPooling2D((2,2),name=pooling_name)(new_conv_layer)
             pooled_layers.append(new_pooling_layer)
 
-        # Add dense top, train the model and freeze all the layers
+        # Add dense top, train the model and freeze all the layers. Then save if need be
         network,output_layers = Add_ensemble_output(input_tensor=input_tensor,
             top_layers=pooled_layers,ensemble_size=ensemble_size,convolutions=True)
         network.compile(optimizer='rmsprop',loss='mse', metrics=['mse', 'mae'])
@@ -527,6 +527,9 @@ def ensamble_network_LBL(
             sample_sizes = sample_sizes,iteration_numbers = iteration_numbers,
             verbose=verbose,nbr_outputs=ensemble_size,parameter_function=parameter_function)
         freeze_all_layers(network)
+        if(save_networks):
+            network.save(model_path+"network_no"+str(layer_no)+".h5")
+
     # Adding flatten layers
     flattened_layers = []
     for i in range(ensemble_size):
@@ -560,19 +563,8 @@ def ensamble_network_LBL(
             sample_sizes = sample_sizes,iteration_numbers = iteration_numbers,
             verbose=verbose,nbr_outputs=ensemble_size,parameter_function=parameter_function)
         freeze_all_layers(network)
-    # Add  output layes
-    # output_layers = []
-    #
-    # for i in range(ensemble_size):
-    #         output_name = "Output_"+str(i+1)
-    #         if len(dense_layers_sizes)>0:
-    #             new_dense_out = layers.Dense(3,name=output_name)(dense_layers[i])
-    #         else:
-    #             new_dense_out = layers.Dense(3,name=output_name)(flattened_layers[i])
-    #
-    #         output_layers.append(new_dense_out)
-    #
-    # network = models.Model(input_tensor,output_layers)
+        if(save_networks):
+            network.save(model_path+"network_no"+str(len(conv_layers_sizes)+layer_no)+".h5")
 
     return network
 def Add_ensemble_output(input_tensor,top_layers,ensemble_size,convolutions):
