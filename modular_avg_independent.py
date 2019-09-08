@@ -208,7 +208,7 @@ def build_full_independent_modular_avg_network(
     layer_types,
     input_shape=(51,51,1),
     output_shape=3,
-    nbr_nodes_added=8,
+    nbr_nodes_added=8, # Change to array...
     sample_sizes=(8, 32, 128, 512, 1024),
     iteration_numbers=(401, 301, 201, 101, 51),
     verbose=0.01,
@@ -270,4 +270,7 @@ def build_full_independent_modular_avg_network(
             save_networks=save_networks,
             model_path=model_path,
             layer_type=layer_types[idx])
+    from keras import models
+    avg_network = models.Model(input_tensor,output_list)
+
     return network

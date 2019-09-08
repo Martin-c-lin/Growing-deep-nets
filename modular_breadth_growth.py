@@ -472,3 +472,128 @@ def simultaneus_training_network(conv_layers_sizes,
     if save_networks:
         single_network.save(model_path+'simultaneus_training_network.h5')
     return single_network
+def ensamble_network_LBL(
+        conv_layers_sizes,# 1d array
+        dense_layers_sizes,# 1d array
+        ensemble_size=2,
+        sample_sizes=[8,32,128,512,1024],
+        iteration_numbers=[4000,3000,2000,1000,500],
+        SN_limits=[10,100],
+        translation_distance=1,
+        verbose=0.01,
+        model_path="",
+        save_networks=True,
+        input_shape=(51,51,1),
+        parameter_function=0):
+    ### # TODO: ADD TRAINING LBL style
+    # Save networks
+    import deeptrack
+    from keras import layers,models,Input
+    import numpy as np
+
+
+    input_tensor = Input(input_shape)
+
+    pooled_layers = []
+    old_pooled_layers = []
+
+    # Add the convolutional layers
+    if(len(conv_layers_sizes)<1):
+        print("Error no convolutional layers")
+        return 0
+
+    for layer_no in range(len(conv_layers_sizes)):# range(1):
+        old_pooled_layers = pooled_layers
+        pooled_layers = []
+        for i in range(ensemble_size):
+            conv_name = "conv_layer_"+str(layer_no)+'_'+str(i)
+            pooling_name = "pooling_layer_"+str(layer_no)+'_'+str(i)
+            if layer_no==0:
+                new_conv_layer = layers.Conv2D(conv_layers_sizes[layer_no],(3,3),
+                    activation='relu',name=conv_name)(input_tensor)
+            else:
+                new_conv_layer = layers.Conv2D(conv_layers_sizes[layer_no],(3,3),
+                    activation='relu',name=conv_name)(old_pooled_layers[i])
+
+            new_pooling_layer = layers.MaxPooling2D((2,2),name=pooling_name)(new_conv_layer)
+            pooled_layers.append(new_pooling_layer)
+
+        # Add dense top, train the model and freeze all the layers
+        network,output_layers = Add_ensemble_output(input_tensor=input_tensor,
+            top_layers=pooled_layers,ensemble_size=ensemble_size,convolutions=True)
+        network.compile(optimizer='rmsprop',loss='mse', metrics=['mse', 'mae'])
+        deeptrack.train_deep_learning_network_mp(network,
+            translation_distance=translation_distance,SN_limits = SN_limits,
+            sample_sizes = sample_sizes,iteration_numbers = iteration_numbers,
+            verbose=verbose,nbr_outputs=ensemble_size,parameter_function=parameter_function)
+        freeze_all_layers(network)
+    # Adding flatten layers
+    flattened_layers = []
+    for i in range(ensemble_size):
+            flattened_name = "flatten_layer_"+str(i)
+            new_flattened = layers.Flatten(name=flattened_name)(pooled_layers[i])
+            flattened_layers.append(new_flattened)
+
+    # Add dense layers
+    dense_layers = []
+    old_dense_layers = []
+    for layer_no in range(len(dense_layers_sizes)):
+        old_dense_layers = dense_layers
+        dense_layers = []
+        for i in range(ensemble_size):
+            dense_name = "dense_layer_"+str(layer_no)+'_'+str(i)
+
+            if(layer_no==0):
+                new_dense_layer = layers.Dense(dense_layers_sizes[layer_no],
+                activation='relu',name=dense_name)(flattened_layers[i])
+            else:
+                new_dense_layer = layers.Dense(dense_layers_sizes[layer_no],
+                activation='relu',name=dense_name)(old_dense_layers[i])
+            dense_layers.append(new_dense_layer)
+
+        network,output_layers = Add_ensemble_output(input_tensor=input_tensor,
+            top_layers=dense_layers,ensemble_size=ensemble_size,convolutions=False)
+        network.compile(optimizer='rmsprop', loss='mse', metrics=['mse', 'mae'])
+        network.summary()
+        deeptrack.train_deep_learning_network_mp(network,
+            translation_distance=translation_distance,SN_limits = SN_limits,
+            sample_sizes = sample_sizes,iteration_numbers = iteration_numbers,
+            verbose=verbose,nbr_outputs=ensemble_size,parameter_function=parameter_function)
+        freeze_all_layers(network)
+    # Add  output layes
+    # output_layers = []
+    #
+    # for i in range(ensemble_size):
+    #         output_name = "Output_"+str(i+1)
+    #         if len(dense_layers_sizes)>0:
+    #             new_dense_out = layers.Dense(3,name=output_name)(dense_layers[i])
+    #         else:
+    #             new_dense_out = layers.Dense(3,name=output_name)(flattened_layers[i])
+    #
+    #         output_layers.append(new_dense_out)
+    #
+    # network = models.Model(input_tensor,output_layers)
+
+    return network
+def Add_ensemble_output(input_tensor,top_layers,ensemble_size,convolutions):
+        # Function which adds an output on top of a ensemble network
+        from keras import layers,models
+        output_layers = []
+
+        # Add flattening to convolutional layers
+        if convolutions:
+            new_top_layers = []
+            for i in range(ensemble_size):
+                flattened_name = "flatten_layer_"+str(i)
+                new_flattened = layers.Flatten(name=flattened_name)(top_layers[i])
+                new_top_layers.append(new_flattened)
+            top_layers = new_top_layers
+
+        # Add outputs
+        for i in range(ensemble_size):
+                output_name = "Output_"+str(i+1)
+                new_dense_out = layers.Dense(3,name=output_name)(top_layers[i])
+                output_layers.append(new_dense_out)
+        # Create network
+        network = models.Model(input_tensor,output_layers)
+        return network,output_layers
