@@ -501,7 +501,6 @@ def ensamble_network_LBL(
     if(len(conv_layers_sizes)<1):
         print("Error no convolutional layers")
         return 0
-
     for layer_no in range(len(conv_layers_sizes)):# range(1):
         old_pooled_layers = pooled_layers
         pooled_layers = []
@@ -522,6 +521,7 @@ def ensamble_network_LBL(
         network,output_layers = Add_ensemble_output(input_tensor=input_tensor,
             top_layers=pooled_layers,ensemble_size=ensemble_size,convolutions=True)
         network.compile(optimizer='rmsprop',loss='mse', metrics=['mse', 'mae'])
+        network.summary()
         deeptrack.train_deep_learning_network_mp(network,
             translation_distance=translation_distance,SN_limits = SN_limits,
             sample_sizes = sample_sizes,iteration_numbers = iteration_numbers,

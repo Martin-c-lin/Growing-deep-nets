@@ -1,0 +1,2 @@
+Used LBL_breadth_growth to train the models. Parameter function 3 and
+TD(translation distance) value of 5. Used standard amount of training and extra pooling set to 1
